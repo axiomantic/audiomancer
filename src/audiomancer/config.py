@@ -114,6 +114,52 @@ class LoggingConfig(BaseModel):
         return v.upper()
 
 
+class LibraryConfig(BaseModel):
+    """Configuration for sample library management.
+
+    The library system manages sample packs from a source (e.g., Google Drive)
+    to a local project with the structure:
+        {project_root}/samples/  - Local cache
+        {project_root}/library/  - Active samples (symlinks)
+    """
+    # Source directory (e.g., Google Drive samples folder)
+    source_dir: Path = Field(
+        default_factory=lambda: Path(
+            "~/Library/CloudStorage/GoogleDrive-elijahr@gmail.com/"
+            "My Drive/Manual Library/Music Production/Samples"
+        ).expanduser().resolve()
+    )
+
+    # Project root - expects samples/ and library/ subdirectories
+    project_root: Path = Field(
+        default_factory=lambda: Path("~/Development/my-music").expanduser().resolve()
+    )
+
+    # Auto-analyze samples when enabling packs
+    auto_analyze: bool = True
+
+    # Skip files larger than this (MB), 0 = no limit
+    max_file_size_mb: int = Field(default=10, ge=0, le=500)
+
+    # Number of parallel copy workers
+    copy_workers: int = Field(default=16, ge=1, le=64)
+
+    @field_validator("source_dir", "project_root", mode="before")
+    @classmethod
+    def expand_path(cls, v: str | Path) -> Path:
+        return Path(v).expanduser().resolve()
+
+    @property
+    def samples_dir(self) -> Path:
+        """Local cache directory for copied samples."""
+        return self.project_root / "samples"
+
+    @property
+    def library_dir(self) -> Path:
+        """Active samples directory (symlinks to samples/)."""
+        return self.project_root / "library"
+
+
 class AudiomancerConfig(BaseModel):
     """Root configuration for audiomancer."""
     sources: SourcesConfig = Field(default_factory=SourcesConfig)
@@ -122,6 +168,7 @@ class AudiomancerConfig(BaseModel):
     storage: StorageConfig = Field(default_factory=StorageConfig)
     generation: GenerationConfig = Field(default_factory=GenerationConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    library: LibraryConfig = Field(default_factory=LibraryConfig)
 
 
 def get_config_path() -> Path:
@@ -201,6 +248,8 @@ def ensure_directories(config: AudiomancerConfig) -> None:
         config.storage.embeddings_path,
         config.storage.models_path,
         config.logging.log_dir,
+        config.library.samples_dir,
+        config.library.library_dir,
     ]
 
     for directory in directories:

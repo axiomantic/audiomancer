@@ -350,3 +350,73 @@ class SubprocessTimeoutError(SuperColliderError):
             msg += f"\nElapsed: {self.details['elapsed']:.1f}s"
         msg += "\nTip: Increase subprocess timeout in config.yaml or check for infinite loops"
         return msg
+
+
+class LibraryError(AudiomancerError):
+    """
+    Sample library management errors.
+
+    Base class for errors during library operations (enable/disable packs).
+
+    Example:
+        >>> raise LibraryError(
+        ...     "Failed to copy pack",
+        ...     details={"pack": "808 Drum Kit", "error": "disk full"}
+        ... )
+    """
+    pass
+
+
+class PackNotFoundError(LibraryError):
+    """
+    Sample pack does not exist in source directory.
+
+    Example:
+        >>> raise PackNotFoundError("Nonexistent Pack", Path("/source"))
+    """
+
+    def __init__(self, pack_name: str, source_dir: "Path", details: Optional[Dict[str, Any]] = None):
+        from pathlib import Path
+        merged_details = details or {}
+        merged_details["pack_name"] = pack_name
+        merged_details["source_dir"] = str(source_dir)
+
+        super().__init__(
+            f"Pack not found: {pack_name}",
+            details=merged_details
+        )
+        self.pack_name = pack_name
+        self.source_dir = source_dir
+
+    def __str__(self) -> str:
+        msg = super().__str__()
+        msg += f"\nPack: {self.pack_name}"
+        msg += f"\nSource: {self.details.get('source_dir', 'unknown')}"
+        msg += "\nTip: Check pack name spelling or run 'audiomancer library list'"
+        return msg
+
+
+class SourceNotAvailableError(LibraryError):
+    """
+    Source directory (e.g., Google Drive) is not accessible.
+
+    Example:
+        >>> raise SourceNotAvailableError(Path("/mnt/google-drive/samples"))
+    """
+
+    def __init__(self, source_dir: "Path", details: Optional[Dict[str, Any]] = None):
+        from pathlib import Path
+        merged_details = details or {}
+        merged_details["source_dir"] = str(source_dir)
+
+        super().__init__(
+            f"Source directory not available: {source_dir}",
+            details=merged_details
+        )
+        self.source_dir = source_dir
+
+    def __str__(self) -> str:
+        msg = super().__str__()
+        msg += f"\nSource: {self.details.get('source_dir', 'unknown')}"
+        msg += "\nTip: Check if Google Drive is mounted and accessible"
+        return msg

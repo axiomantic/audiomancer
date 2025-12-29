@@ -30,7 +30,11 @@ from audiomancer.errors import (
     AudiomancerError,
     SampleNotFoundError,
     AnalysisError,
+    LibraryError,
+    PackNotFoundError,
+    SourceNotAvailableError,
 )
+from audiomancer.library import LibraryManager
 
 
 server = Server("audiomancer")
@@ -38,6 +42,7 @@ server = Server("audiomancer")
 # Global storage instances (initialized in main)
 storage: Optional[UnifiedSampleStorage] = None
 synth_store: Optional[SynthStore] = None
+library_manager: Optional[LibraryManager] = None
 
 
 @server.list_tools()
@@ -168,7 +173,104 @@ async def list_tools() -> list[Tool]:
                 "type": "object",
                 "properties": {}
             }
-        )
+        ),
+        # Library management tools
+        Tool(
+            name="list_packs",
+            description="List all available sample packs from the source directory (e.g., Google Drive). Shows status (enabled/cached/remote) for each pack.",
+            inputSchema={
+                "type": "object",
+                "properties": {}
+            }
+        ),
+        Tool(
+            name="search_packs",
+            description="Search sample packs by name pattern.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pattern": {
+                        "type": "string",
+                        "description": "Regex pattern to match against pack names"
+                    }
+                },
+                "required": ["pattern"]
+            }
+        ),
+        Tool(
+            name="get_pack_status",
+            description="Get detailed status of a sample pack including files, size, and sample IDs.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pack_name": {
+                        "type": "string",
+                        "description": "Name of the pack folder"
+                    }
+                },
+                "required": ["pack_name"]
+            }
+        ),
+        Tool(
+            name="enable_pack",
+            description="Enable a sample pack - copies from source to local cache and creates symlinks for SuperDirt.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pack_name": {
+                        "type": "string",
+                        "description": "Name of the pack to enable"
+                    },
+                    "max_size_mb": {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Skip files larger than this (MB)"
+                    }
+                },
+                "required": ["pack_name"]
+            }
+        ),
+        Tool(
+            name="disable_pack",
+            description="Disable a sample pack - removes symlinks but keeps cached files.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pack_name": {
+                        "type": "string",
+                        "description": "Name of the pack to disable"
+                    }
+                },
+                "required": ["pack_name"]
+            }
+        ),
+        Tool(
+            name="purge_pack",
+            description="Remove a sample pack from local cache entirely.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pack_name": {
+                        "type": "string",
+                        "description": "Name of the pack to purge"
+                    }
+                },
+                "required": ["pack_name"]
+            }
+        ),
+        Tool(
+            name="list_enabled_samples",
+            description="List all enabled sample IDs with their categories. These can be used in TidalCycles patterns.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": "string",
+                        "description": "Filter by category (bd, sn, hh, etc.)"
+                    }
+                }
+            }
+        ),
     ]
 
 
@@ -190,13 +292,30 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return await get_synth(**arguments)
         elif name == "get_stats":
             return await get_stats(**arguments)
+        # Library management tools
+        elif name == "list_packs":
+            return await list_packs_tool(**arguments)
+        elif name == "search_packs":
+            return await search_packs_tool(**arguments)
+        elif name == "get_pack_status":
+            return await get_pack_status_tool(**arguments)
+        elif name == "enable_pack":
+            return await enable_pack_tool(**arguments)
+        elif name == "disable_pack":
+            return await disable_pack_tool(**arguments)
+        elif name == "purge_pack":
+            return await purge_pack_tool(**arguments)
+        elif name == "list_enabled_samples":
+            return await list_enabled_samples_tool(**arguments)
         else:
             error_response = {
                 "error": "UnknownTool",
                 "message": f"Unknown tool: {name}",
                 "available_tools": [
                     "search_samples", "find_similar", "describe_sample",
-                    "analyze_file", "list_synths", "get_synth", "get_stats"
+                    "analyze_file", "list_synths", "get_synth", "get_stats",
+                    "list_packs", "search_packs", "get_pack_status",
+                    "enable_pack", "disable_pack", "purge_pack", "list_enabled_samples"
                 ]
             }
             return [TextContent(type="text", text=json.dumps(error_response, indent=2))]
@@ -569,9 +688,184 @@ async def get_stats() -> list[TextContent]:
     return [TextContent(type="text", text=json.dumps(response, indent=2))]
 
 
+# Library management tool handlers
+
+async def list_packs_tool() -> list[TextContent]:
+    """List all available sample packs from source."""
+    if library_manager is None:
+        raise AudiomancerError("Library manager not initialized")
+
+    loop = asyncio.get_event_loop()
+    packs = await loop.run_in_executor(None, library_manager.list_packs)
+
+    # Get status for each pack
+    formatted = []
+    for pack in packs:
+        try:
+            status = await loop.run_in_executor(
+                None, library_manager.get_pack_status, pack["name"]
+            )
+            formatted.append({
+                "name": pack["name"],
+                "status": status["status"],
+                "file_count": pack["file_count"],
+                "size_mb": round(pack["size_mb"], 1),
+                "sample_ids": pack["sample_ids"],
+            })
+        except Exception:
+            formatted.append({
+                "name": pack["name"],
+                "status": "unknown",
+                "file_count": pack["file_count"],
+                "size_mb": round(pack["size_mb"], 1),
+            })
+
+    response = {
+        "packs": formatted,
+        "count": len(formatted),
+    }
+    return [TextContent(type="text", text=json.dumps(response, indent=2))]
+
+
+async def search_packs_tool(pattern: str) -> list[TextContent]:
+    """Search packs by name pattern."""
+    if library_manager is None:
+        raise AudiomancerError("Library manager not initialized")
+
+    loop = asyncio.get_event_loop()
+    packs = await loop.run_in_executor(None, library_manager.search_packs, pattern)
+
+    formatted = []
+    for pack in packs:
+        try:
+            status = await loop.run_in_executor(
+                None, library_manager.get_pack_status, pack["name"]
+            )
+            formatted.append({
+                "name": pack["name"],
+                "status": status["status"],
+                "file_count": pack["file_count"],
+                "size_mb": round(pack["size_mb"], 1),
+            })
+        except Exception:
+            formatted.append({
+                "name": pack["name"],
+                "file_count": pack["file_count"],
+                "size_mb": round(pack["size_mb"], 1),
+            })
+
+    response = {
+        "pattern": pattern,
+        "results": formatted,
+        "count": len(formatted),
+    }
+    return [TextContent(type="text", text=json.dumps(response, indent=2))]
+
+
+async def get_pack_status_tool(pack_name: str) -> list[TextContent]:
+    """Get detailed status of a pack."""
+    if library_manager is None:
+        raise AudiomancerError("Library manager not initialized")
+
+    loop = asyncio.get_event_loop()
+    status = await loop.run_in_executor(
+        None, library_manager.get_pack_status, pack_name
+    )
+
+    return [TextContent(type="text", text=json.dumps(status, indent=2))]
+
+
+async def enable_pack_tool(pack_name: str, max_size_mb: int = 10) -> list[TextContent]:
+    """Enable a sample pack."""
+    if library_manager is None:
+        raise AudiomancerError("Library manager not initialized")
+
+    result = await library_manager.enable_pack_async(
+        pack_name=pack_name,
+        max_size_mb=max_size_mb,
+    )
+
+    response = {
+        "success": True,
+        "pack_name": result["pack_name"],
+        "samples_enabled": result["samples_enabled"],
+        "sample_ids": result["sample_ids"],
+        "copy_stats": result["copy_stats"],
+        "message": f"Enabled {result['samples_enabled']} samples. Restart SuperDirt to load.",
+    }
+    return [TextContent(type="text", text=json.dumps(response, indent=2))]
+
+
+async def disable_pack_tool(pack_name: str) -> list[TextContent]:
+    """Disable a sample pack."""
+    if library_manager is None:
+        raise AudiomancerError("Library manager not initialized")
+
+    loop = asyncio.get_event_loop()
+    count = await loop.run_in_executor(
+        None, library_manager.disable_pack, pack_name
+    )
+
+    response = {
+        "success": True,
+        "pack_name": pack_name,
+        "samples_disabled": count,
+        "message": f"Disabled {count} samples. Restart SuperDirt to apply.",
+    }
+    return [TextContent(type="text", text=json.dumps(response, indent=2))]
+
+
+async def purge_pack_tool(pack_name: str) -> list[TextContent]:
+    """Purge a sample pack from cache."""
+    if library_manager is None:
+        raise AudiomancerError("Library manager not initialized")
+
+    loop = asyncio.get_event_loop()
+    removed = await loop.run_in_executor(
+        None, library_manager.purge_pack, pack_name
+    )
+
+    response = {
+        "success": removed,
+        "pack_name": pack_name,
+        "message": "Pack removed from cache." if removed else "Pack was not in cache.",
+    }
+    return [TextContent(type="text", text=json.dumps(response, indent=2))]
+
+
+async def list_enabled_samples_tool(category: Optional[str] = None) -> list[TextContent]:
+    """List enabled sample IDs."""
+    if library_manager is None:
+        raise AudiomancerError("Library manager not initialized")
+
+    loop = asyncio.get_event_loop()
+    samples = await loop.run_in_executor(None, library_manager.list_enabled_samples)
+
+    # Filter by category if provided
+    if category:
+        samples = [s for s in samples if s.get("category") == category]
+
+    # Group by category for easier use
+    by_category: dict[str, list[str]] = {}
+    for sample in samples:
+        cat = sample.get("category", "misc")
+        if cat not in by_category:
+            by_category[cat] = []
+        by_category[cat].append(sample["id"])
+
+    response = {
+        "samples": samples,
+        "by_category": by_category,
+        "count": len(samples),
+        "filter": {"category": category} if category else None,
+        "tip": "Use sample IDs in TidalCycles: d1 $ sound \"sample_id\"",
+    }
+    return [TextContent(type="text", text=json.dumps(response, indent=2))]
+
+
 async def main():
     """Run the MCP server."""
-    global storage, synth_store
+    global storage, synth_store, library_manager
 
     # Load config
     config = load_config()
@@ -584,6 +878,13 @@ async def main():
     )
 
     synth_store = SynthStore(str(config.storage.db_path))
+
+    # Initialize library manager
+    library_manager = LibraryManager(
+        source_dir=config.library.source_dir,
+        samples_dir=config.library.samples_dir,
+        library_dir=config.library.library_dir,
+    )
 
     # Run server
     async with mcp.server.stdio.stdio_server() as (read, write):
