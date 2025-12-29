@@ -73,29 +73,31 @@ class TestAudiomancerConfig:
                 models_path=temp_dir / "models",
             )
         )
-        assert config.storage.db_path == temp_dir / "custom.db"
-        assert config.storage.embeddings_path == temp_dir / "embeddings"
+        # Paths are resolved, so compare resolved versions
+        assert config.storage.db_path == (temp_dir / "custom.db").resolve()
+        assert config.storage.embeddings_path == (temp_dir / "embeddings").resolve()
 
     def test_analysis_config_defaults(self):
         """Analysis config should have sensible defaults."""
         config = AudiomancerConfig()
         assert config.analysis.max_file_size_mb > 0
-        assert config.analysis.sample_rate == 44100
-        assert config.analysis.hop_length > 0
-        assert config.analysis.n_fft > 0
+        assert config.analysis.embedding_dim > 0
+        assert len(config.analysis.skip_patterns) > 0
+        assert isinstance(config.analysis.effnet_model, str)
 
     def test_generation_config_defaults(self):
         """Generation config should have sensible defaults."""
         config = AudiomancerConfig()
         assert 60 <= config.generation.default_bpm <= 240
-        assert config.generation.max_pattern_length > 0
-        assert isinstance(config.generation.default_target, str)
+        assert config.generation.default_bars > 0
+        assert config.generation.inference_timeout > 0
 
     def test_logging_config_defaults(self):
         """Logging config should have sensible defaults."""
         config = AudiomancerConfig()
-        assert config.logging.level in ["DEBUG", "INFO", "WARNING", "ERROR"]
-        assert config.logging.format is not None
+        assert config.logging.level in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        assert config.logging.file_level in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        assert config.logging.max_days > 0
 
 
 class TestConfigPersistence:

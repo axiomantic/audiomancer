@@ -69,13 +69,13 @@ class SuperColliderConfig(BaseModel):
 class StorageConfig(BaseModel):
     """Configuration for data storage."""
     db_path: Path = Field(
-        default=Path("~/.local/share/audiomancer/audiomancer.db")
+        default_factory=lambda: Path("~/.local/share/audiomancer/audiomancer.db").expanduser().resolve()
     )
     embeddings_path: Path = Field(
-        default=Path("~/.local/share/audiomancer/embeddings")
+        default_factory=lambda: Path("~/.local/share/audiomancer/embeddings").expanduser().resolve()
     )
     models_path: Path = Field(
-        default=Path("~/.local/share/audiomancer/models")
+        default_factory=lambda: Path("~/.local/share/audiomancer/models").expanduser().resolve()
     )
 
     @field_validator("db_path", "embeddings_path", "models_path", mode="before")
@@ -96,7 +96,7 @@ class LoggingConfig(BaseModel):
     level: str = Field(default="WARNING")
     file_level: str = Field(default="DEBUG")
     log_dir: Path = Field(
-        default=Path("~/.local/share/audiomancer/logs")
+        default_factory=lambda: Path("~/.local/share/audiomancer/logs").expanduser().resolve()
     )
     max_days: int = Field(default=7, ge=1, le=30)
 

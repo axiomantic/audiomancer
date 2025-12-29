@@ -1,5 +1,6 @@
 """Tests for MIDI to TidalCycles conversion."""
 
+import io
 import pytest
 
 try:
@@ -42,7 +43,7 @@ class TestMidiToTidal:
         track.append(mido.Message('note_off', note=38, velocity=0, time=120))
 
         # Convert to bytes
-        bytes_io = mido.BytesIO()
+        bytes_io = io.BytesIO()
         midi.save(file=bytes_io)
         midi_bytes = bytes_io.getvalue()
 
@@ -64,7 +65,7 @@ class TestMidiToTidal:
         track.append(mido.Message('note_on', note=60, velocity=100, time=0))
         track.append(mido.Message('note_off', note=60, velocity=0, time=120))
 
-        bytes_io = mido.BytesIO()
+        bytes_io = io.BytesIO()
         midi.save(file=bytes_io)
         midi_bytes = bytes_io.getvalue()
 
@@ -102,7 +103,7 @@ class TestTidalToMidi:
         assert midi_bytes.startswith(b'MThd')
 
         # Parse and verify
-        midi = mido.MidiFile(file=mido.BytesIO(midi_bytes))
+        midi = mido.MidiFile(file=io.BytesIO(midi_bytes))
         assert len(midi.tracks) > 0
 
     def test_tidal_to_midi_tempo(self):
@@ -112,7 +113,7 @@ class TestTidalToMidi:
         midi_bytes = tidal_to_midi(tidal, bpm=140.0)
 
         # Parse MIDI
-        midi = mido.MidiFile(file=mido.BytesIO(midi_bytes))
+        midi = mido.MidiFile(file=io.BytesIO(midi_bytes))
 
         # Find tempo message
         tempo_found = False
@@ -134,7 +135,7 @@ class TestTidalToMidi:
         midi_bytes = tidal_to_midi(tidal, bpm=120.0)
 
         # Parse MIDI
-        midi = mido.MidiFile(file=mido.BytesIO(midi_bytes))
+        midi = mido.MidiFile(file=io.BytesIO(midi_bytes))
 
         # Count note_on messages
         note_count = 0
@@ -155,7 +156,7 @@ class TestTidalToMidi:
         assert midi_bytes.startswith(b'MThd')
 
         # Parse and count notes (should only have bd and sn, not rests)
-        midi = mido.MidiFile(file=mido.BytesIO(midi_bytes))
+        midi = mido.MidiFile(file=io.BytesIO(midi_bytes))
         note_count = 0
         for track in midi.tracks:
             for msg in track:
@@ -284,7 +285,7 @@ class TestEdgeCases:
         midi.tracks.append(track)
         track.append(mido.MetaMessage('end_of_track', time=0))
 
-        bytes_io = mido.BytesIO()
+        bytes_io = io.BytesIO()
         midi.save(file=bytes_io)
         midi_bytes = bytes_io.getvalue()
 

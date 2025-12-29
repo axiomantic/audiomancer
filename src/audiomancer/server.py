@@ -309,8 +309,8 @@ async def find_similar(
         )
     except SampleNotFoundError:
         raise SampleNotFoundError(
-            f"Sample not found: {sample_id}",
-            details={"sample_id": sample_id, "reason": "No sample with this ID exists"}
+            sample_id,
+            details={"reason": "No sample with this ID exists"}
         )
 
     # Format results
@@ -351,10 +351,7 @@ async def describe_sample(sample_id: str) -> list[TextContent]:
 
     sample = storage.get_sample(sample_id)
     if sample is None:
-        raise SampleNotFoundError(
-            f"Sample not found: {sample_id}",
-            details={"sample_id": sample_id}
-        )
+        raise SampleNotFoundError(sample_id)
 
     # Convert to serializable format
     serializable_sample = dict(sample)

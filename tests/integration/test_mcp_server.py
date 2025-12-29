@@ -172,10 +172,7 @@ class TestFindSimilar:
     @pytest.mark.asyncio
     async def test_find_similar_sample_not_found(self, mock_storage):
         """Test error when sample not found."""
-        mock_storage.find_similar.side_effect = SampleNotFoundError(
-            "Sample not found",
-            details={"sample_id": "nonexistent"}
-        )
+        mock_storage.find_similar.side_effect = SampleNotFoundError("nonexistent")
 
         with pytest.raises(SampleNotFoundError) as exc_info:
             await find_similar(sample_id="nonexistent")
@@ -403,8 +400,8 @@ class TestErrorHandling:
     async def test_sample_not_found_error_details(self, mock_storage):
         """Test SampleNotFoundError includes proper details."""
         mock_storage.find_similar.side_effect = SampleNotFoundError(
-            "Sample not found",
-            details={"sample_id": "missing123", "reason": "No embedding"}
+            "missing123",
+            details={"reason": "No embedding"}
         )
 
         with pytest.raises(SampleNotFoundError) as exc_info:

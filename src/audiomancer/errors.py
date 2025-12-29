@@ -92,17 +92,32 @@ class SampleNotFoundError(StorageError):
     """
     Requested sample does not exist in the database.
 
+    Attributes:
+        sample_id: ID of the sample that was not found
+
     Example:
+        >>> raise SampleNotFoundError("abc123")
         >>> raise SampleNotFoundError(
-        ...     "Sample not found",
-        ...     details={"sample_id": "abc123", "query": "SELECT * FROM samples WHERE id=?"}
+        ...     "abc123",
+        ...     details={"query": "SELECT * FROM samples WHERE id=?"}
         ... )
     """
 
+    def __init__(self, sample_id: str, details: Optional[Dict[str, Any]] = None):
+        merged_details = details or {}
+        merged_details["sample_id"] = sample_id
+
+        super().__init__(
+            f"Sample not found: {sample_id}",
+            details=merged_details
+        )
+        self.sample_id = sample_id
+
     def __str__(self) -> str:
         msg = super().__str__()
-        if "sample_id" in self.details:
-            msg += f"\nSample ID: {self.details['sample_id']}"
+        msg += f"\nSample ID: {self.sample_id}"
+        if "reason" in self.details:
+            msg += f"\n{self.details['reason']}"
         if "path" in self.details:
             msg += f"\nPath: {self.details['path']}"
         msg += "\nTip: Run 'audiomancer import' to add samples"
@@ -118,6 +133,7 @@ class DuplicateSampleError(StorageError):
 
     Attributes:
         existing_id: Database ID of the existing duplicate sample
+        file_path: Path to the duplicate sample file
 
     Example:
         >>> raise DuplicateSampleError(
@@ -130,12 +146,14 @@ class DuplicateSampleError(StorageError):
         merged_details = details or {}
         merged_details["existing_id"] = existing_id
         merged_details["path"] = path
+        merged_details["file_path"] = path  # Also store as file_path for consistency
 
         super().__init__(
             f"Sample already exists: {path}",
             details=merged_details
         )
         self.existing_id = existing_id
+        self.file_path = path
 
     def __str__(self) -> str:
         msg = super().__str__()

@@ -315,8 +315,8 @@ class UnifiedSampleStorage:
         embedding = self.vector_store.get_embedding(sample_id)
         if embedding is None:
             raise SampleNotFoundError(
-                f"No embedding found for sample {sample_id}",
-                details={"sample_id": sample_id, "reason": "No embedding found for sample"}
+                sample_id,
+                details={"reason": "No embedding found for sample"}
             )
 
         # Find similar embeddings
