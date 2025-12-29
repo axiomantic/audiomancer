@@ -1,0 +1,11 @@
+# Temporary benchmark results
+results_*.json
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Temporary databases
+*.db
+lance_*

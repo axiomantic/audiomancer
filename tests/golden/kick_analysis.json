@@ -1,0 +1,52 @@
+{
+  "description": "Golden file for basic and spectral analysis of a 440Hz sine kick",
+  "test_audio": {
+    "waveform": "sine",
+    "frequency": 440,
+    "duration": 0.25,
+    "sample_rate": 44100
+  },
+  "basic_metadata": {
+    "duration_ms": 250.0,
+    "sample_rate": 44100,
+    "channels": 1,
+    "bit_depth": 16
+  },
+  "spectral_features": {
+    "spectral_centroid": {
+      "min": 400,
+      "max": 500,
+      "description": "Should be near 440Hz for pure sine"
+    },
+    "spectral_bandwidth": {
+      "min": 0,
+      "max": 100,
+      "description": "Pure sine has narrow bandwidth"
+    },
+    "spectral_rolloff": {
+      "min": 400,
+      "max": 600,
+      "description": "Should be close to fundamental frequency"
+    },
+    "zero_crossing_rate": {
+      "min": 0.01,
+      "max": 0.05,
+      "description": "Pure sine has consistent low ZCR"
+    },
+    "rms_energy": {
+      "min": 0.6,
+      "max": 0.8,
+      "description": "Sine wave RMS is 1/sqrt(2) ≈ 0.707"
+    },
+    "dynamic_range": {
+      "min": 2.5,
+      "max": 3.5,
+      "description": "Sine wave has ~3dB dynamic range"
+    }
+  },
+  "notes": [
+    "This golden file defines acceptable ranges rather than exact values",
+    "Spectral features may vary slightly due to windowing and FFT",
+    "Values are based on theoretical expectations for a pure 440Hz sine wave"
+  ]
+}

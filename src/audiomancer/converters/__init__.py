@@ -12,6 +12,13 @@ from .interfaces import (
     SCPattern,
     TidalPattern,
 )
+from .midi_sc import (
+    midi_to_supercollider,
+    supercollider_to_midi,
+    midi_to_freq,
+    freq_to_midi,
+    quantize_time,
+)
 
 __all__ = [
     "DRUM_MIDI_MAP",
@@ -21,4 +28,9 @@ __all__ = [
     "MidiTrack",
     "SCPattern",
     "TidalPattern",
+    "midi_to_supercollider",
+    "supercollider_to_midi",
+    "midi_to_freq",
+    "freq_to_midi",
+    "quantize_time",
 ]

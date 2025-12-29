@@ -215,14 +215,20 @@ def doctor():
 
 
 @app.command()
-def serve(
-    host: str = typer.Option("localhost", help="Host to bind to"),
-    port: int = typer.Option(8080, help="Port to bind to"),
-):
-    """Start the MCP server."""
-    console.print(f"[yellow]MCP server not yet implemented[/yellow]")
-    console.print(f"Would start on {host}:{port}")
-    console.print("\n[dim]Coming soon: FastMCP server for audio analysis[/dim]")
+def serve():
+    """Start the MCP server (stdio mode for Claude Desktop)."""
+    try:
+        from .server import main
+        import asyncio
+
+        # Run the async main function
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Server stopped[/yellow]")
+        sys.exit(0)
+    except Exception as e:
+        console.print(f"[red]Error starting server:[/red] {e}")
+        sys.exit(1)
 
 
 @app.command()
@@ -257,6 +263,120 @@ def stats():
     """Show library statistics."""
     console.print("[yellow]Stats not yet implemented[/yellow]")
     console.print("\n[dim]Coming soon: Library statistics and visualizations[/dim]")
+
+
+@app.command()
+def benchmark(
+    baseline: bool = typer.Option(False, "--baseline", help="Create new baseline"),
+    check: bool = typer.Option(False, "--check", help="Check for regressions"),
+    threshold: float = typer.Option(20.0, "--threshold", help="Regression threshold (%)"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output file"),
+):
+    """Run performance benchmarks."""
+    import subprocess
+    import json
+    from datetime import datetime
+
+    benchmarks_dir = Path(__file__).parent.parent.parent.parent / "benchmarks"
+
+    if not benchmarks_dir.exists():
+        console.print("[red]Error:[/red] Benchmarks directory not found")
+        console.print(f"Expected: {benchmarks_dir}")
+        sys.exit(1)
+
+    if baseline:
+        # Run benchmarks and create baseline
+        console.print("[bold]Running benchmarks to create baseline...[/bold]\n")
+
+        result = subprocess.run(
+            [sys.executable, str(benchmarks_dir / "run_benchmarks.py")],
+            cwd=benchmarks_dir,
+            capture_output=False,
+        )
+
+        if result.returncode != 0:
+            console.print("\n[red]Benchmarks failed[/red]")
+            sys.exit(1)
+
+        console.print("\n[green]✓ Baseline created successfully[/green]")
+        sys.exit(0)
+
+    elif check:
+        # Run benchmarks and check for regressions
+        console.print("[bold]Running benchmarks and checking for regressions...[/bold]\n")
+
+        # Run benchmarks to temporary file
+        temp_results = benchmarks_dir / f"results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+
+        # First run benchmarks
+        result = subprocess.run(
+            [sys.executable, str(benchmarks_dir / "run_benchmarks.py")],
+            cwd=benchmarks_dir,
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode != 0:
+            console.print("\n[red]Benchmarks failed[/red]")
+            console.print(result.stderr)
+            sys.exit(1)
+
+        # Move baseline.json to temp location
+        baseline_file = benchmarks_dir / "baseline.json"
+        if baseline_file.exists():
+            import shutil
+            shutil.copy(baseline_file, temp_results)
+        else:
+            console.print("[red]Error:[/red] No baseline found. Run with --baseline first.")
+            sys.exit(2)
+
+        # Check for regressions
+        console.print("\n[bold]Checking for regressions...[/bold]\n")
+
+        # Load current results (just created)
+        with open(baseline_file) as f:
+            current_data = json.load(f)
+
+        # Save to output if specified
+        if output:
+            with open(output, 'w') as f:
+                json.dump(current_data, f, indent=2)
+            console.print(f"[dim]Results saved to: {output}[/dim]\n")
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(benchmarks_dir / "check_regression.py"),
+                str(baseline_file),
+                "--baseline",
+                str(temp_results),
+                "--threshold",
+                str(threshold),
+            ],
+            cwd=benchmarks_dir,
+        )
+
+        sys.exit(result.returncode)
+
+    else:
+        # Just run benchmarks
+        console.print("[bold]Running performance benchmarks...[/bold]\n")
+
+        result = subprocess.run(
+            [sys.executable, str(benchmarks_dir / "run_benchmarks.py")],
+            cwd=benchmarks_dir,
+        )
+
+        if result.returncode == 0:
+            baseline_file = benchmarks_dir / "baseline.json"
+            console.print(f"\n[green]✓ Results saved to:[/green] {baseline_file}")
+
+            if output:
+                import shutil
+                shutil.copy(baseline_file, output)
+                console.print(f"[green]✓ Copied to:[/green] {output}")
+
+        sys.exit(result.returncode)
 
 
 def main():

@@ -8,9 +8,13 @@ from .interfaces import (
     SampleStore,
     VectorStore,
 )
+from .vectors import LanceDBVectorStore
+from .synth_store import SynthStore
 
 __all__ = [
     "SampleMetadata",
     "SampleStore",
     "VectorStore",
+    "LanceDBVectorStore",
+    "SynthStore",
 ]
