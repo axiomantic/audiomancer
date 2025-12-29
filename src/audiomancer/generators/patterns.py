@@ -11,12 +11,15 @@ import uuid
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Literal, Optional
+from typing import TYPE_CHECKING, Literal, Optional
 
 import mido
 from mido import Message, MidiFile, MidiTrack
 
 from ..errors import GenerationError, InferenceTimeoutError, ModelLoadError
+
+if TYPE_CHECKING:
+    from ..library.interfaces import SampleLookup
 
 # Magenta is not used - all generation is algorithmic
 MAGENTA_AVAILABLE = False
@@ -180,12 +183,17 @@ def _parse_key(key_str: str) -> int:
     return NOTE_NAMES[key_clean]
 
 
-def _drum_pattern_to_tidal(template: dict[str, list[bool]], style: str) -> str:
+def _drum_pattern_to_tidal(
+    template: dict[str, list[bool]],
+    style: str,
+    custom_samples: Optional[dict[str, str]] = None,
+) -> str:
     """Convert drum pattern template to TidalCycles code.
 
     Args:
         template: Drum pattern with boolean lists for each instrument
         style: Style name for sample selection
+        custom_samples: Optional custom sample map from library lookup
 
     Returns:
         TidalCycles pattern code
@@ -197,8 +205,8 @@ def _drum_pattern_to_tidal(template: dict[str, list[bool]], style: str) -> str:
             result.append(sound if hit else "~")
         return " ".join(result)
 
-    # Map style to sample choices
-    sample_map = {
+    # Default style-based sample choices
+    default_sample_map = {
         "house": {"kick": "bd", "snare": "sd", "hh": "hh", "oh": "oh"},
         "techno": {"kick": "bd:3", "snare": "cp", "hh": "hc", "oh": "ho"},
         "breakbeat": {"kick": "bd:1", "snare": "sn:2", "hh": "hh:1", "oh": "oh:1"},
@@ -207,7 +215,11 @@ def _drum_pattern_to_tidal(template: dict[str, list[bool]], style: str) -> str:
         "minimal": {"kick": "bd:0", "snare": "sd:1", "hh": "hh:0", "oh": "oh:0"},
     }
 
-    samples = sample_map.get(style, sample_map["house"])
+    # Use custom samples if provided, otherwise fall back to style defaults
+    if custom_samples:
+        samples = custom_samples
+    else:
+        samples = default_sample_map.get(style, default_sample_map["house"])
 
     # Build multi-channel Tidal code
     lines = []
@@ -272,6 +284,7 @@ def generate_drums(
     temperature: float = 1.0,
     timeout: float = 30.0,
     seed: Optional[int] = None,
+    sample_lookup: Optional["SampleLookup"] = None,
 ) -> Pattern:
     """Generate a drum pattern using algorithmic methods.
 
@@ -287,6 +300,8 @@ def generate_drums(
         temperature: Randomness (0.0 = deterministic, 1.0 = default, >1.0 = more variation)
         timeout: Maximum generation time in seconds
         seed: Random seed for reproducibility
+        sample_lookup: Optional SampleLookup interface for querying real sample IDs
+            from the library. If provided, uses library samples instead of defaults.
 
     Returns:
         Generated drum pattern with MIDI, TidalCycles, and SuperCollider code
@@ -437,8 +452,25 @@ def generate_drums(
         midi.save(file=midi_buffer)
         midi_data = midi_buffer.getvalue()
 
+        # Query library samples if sample_lookup provided
+        custom_samples: Optional[dict[str, str]] = None
+        if sample_lookup:
+            # Query for drum samples by type
+            kicks = sample_lookup.get_samples_by_type("bd", bpm=bpm, limit=1)
+            snares = sample_lookup.get_samples_by_type("sn", bpm=bpm, limit=1)
+            hats = sample_lookup.get_samples_by_type("hh", bpm=bpm, limit=1)
+            open_hats = sample_lookup.get_samples_by_type("oh", bpm=bpm, limit=1)
+
+            # Build sample map with library samples, falling back to defaults
+            custom_samples = {
+                "kick": kicks[0] if kicks else "bd",
+                "snare": snares[0] if snares else "sd",
+                "hh": hats[0] if hats else "hh",
+                "oh": open_hats[0] if open_hats else "oh",
+            }
+
         # Generate TidalCycles code
-        tidal_code = _drum_pattern_to_tidal(template, style)
+        tidal_code = _drum_pattern_to_tidal(template, style, custom_samples)
 
         # Generate SuperCollider code
         sc_code = _drum_pattern_to_supercollider(template, style, bpm)
@@ -482,6 +514,7 @@ def generate_melody(
     temperature: float = 1.0,
     timeout: float = 30.0,
     seed: Optional[int] = None,
+    sample_lookup: Optional["SampleLookup"] = None,
 ) -> Pattern:
     """Generate a melody using algorithmic composition.
 
@@ -500,6 +533,8 @@ def generate_melody(
         temperature: Randomness (0.0 = stepwise, 1.0 = balanced, >1.0 = jumpy with rests)
         timeout: Maximum generation time in seconds
         seed: Random seed for reproducibility
+        sample_lookup: Optional SampleLookup interface for querying real sample IDs
+            from the library. If provided, uses library synth/melodic samples.
 
     Returns:
         Generated melody pattern with MIDI, TidalCycles, and SuperCollider code
@@ -609,10 +644,22 @@ def generate_melody(
         midi.save(file=midi_buffer)
         midi_data = midi_buffer.getvalue()
 
+        # Query library samples for synth/melodic sounds if available
+        synth_sample = "superpiano"  # Default
+        if sample_lookup:
+            # Try to find synth or melodic samples
+            synth_samples = sample_lookup.get_samples_by_type("synth", bpm=bpm, limit=1)
+            if not synth_samples:
+                synth_samples = sample_lookup.get_samples_by_type("keys", bpm=bpm, limit=1)
+            if not synth_samples:
+                synth_samples = sample_lookup.get_samples_by_type("lead", bpm=bpm, limit=1)
+            if synth_samples:
+                synth_sample = synth_samples[0]
+
         # Create TidalCycles code
         key_clean = key.replace("minor", "").replace("m", "").strip()
         note_pattern = " ".join([str(n - base_note) if n is not None else "~" for n in melody_notes[:16]])
-        tidal_code = f'd1 $ n "{note_pattern}" # s "superpiano" # scale "{scale}"'
+        tidal_code = f'd1 $ n "{note_pattern}" # s "{synth_sample}" # scale "{scale}"'
 
         # Create SuperCollider code
         midi_notes_str = ", ".join([str(n) if n is not None else "Rest()" for n in melody_notes[:16]])
@@ -667,6 +714,7 @@ def generate_bass(
     style: str = "synth",
     timeout: float = 30.0,
     seed: Optional[int] = None,
+    sample_lookup: Optional["SampleLookup"] = None,
 ) -> Pattern:
     """Generate a bassline using algorithmic composition.
 
@@ -686,6 +734,8 @@ def generate_bass(
         style: Bass style template (synth, acoustic, walking, slap)
         timeout: Maximum generation time in seconds
         seed: Random seed for reproducibility
+        sample_lookup: Optional SampleLookup interface for querying real sample IDs
+            from the library. If provided, uses library bass samples.
 
     Returns:
         Generated bass pattern with MIDI, TidalCycles, and SuperCollider code
@@ -761,10 +811,19 @@ def generate_bass(
         midi.save(file=midi_buffer)
         midi_data = midi_buffer.getvalue()
 
+        # Query library samples for bass sounds if available
+        bass_sample = "bass1"  # Default
+        if sample_lookup:
+            bass_samples = sample_lookup.get_samples_by_type("bass", bpm=bpm, limit=1)
+            if not bass_samples:
+                bass_samples = sample_lookup.get_samples_by_type("sub", bpm=bpm, limit=1)
+            if bass_samples:
+                bass_sample = bass_samples[0]
+
         # Create TidalCycles code
         key_clean = key.replace("minor", "").replace("m", "").strip()
         note_pattern = " ".join([str(n - base_note) for n in bass_notes[:8]])
-        tidal_code = f'd1 $ n "{note_pattern}" # s "bass1" # octave 2'
+        tidal_code = f'd1 $ n "{note_pattern}" # s "{bass_sample}" # octave 2'
 
         # Create SuperCollider code
         midi_notes_str = ", ".join([str(n) for n in bass_notes[:8]])
