@@ -8,7 +8,7 @@ MCP server for music production metadata, analysis, and generation. Analyzes aud
 - **ML Classification**: Instrument type, mood, and genre tagging
 - **Semantic Search**: Find similar samples via 128-dim audio embeddings
 - **SynthDef Parsing**: Parse SuperCollider SynthDefs, extract controls and UGens
-- **Pattern Generation**: Generate drums, melodies, basslines using Magenta
+- **Pattern Generation**: Generate drums, melodies, basslines using Euclidean rhythms
 - **Synth Evolution**: Mutate and breed SynthDefs with lineage tracking
 - **MIDI Conversion**: Bidirectional MIDI to TidalCycles and SuperCollider
 
@@ -29,9 +29,8 @@ audiomancer doctor
 
 ### Requirements
 
-- Python 3.11-3.12
+- Python 3.10+
 - SuperCollider (for SynthDef parsing)
-- Optional: Magenta (for pattern generation)
 
 ## Quick Start
 

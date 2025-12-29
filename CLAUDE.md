@@ -19,7 +19,7 @@ An MCP server that analyzes music production assets (samples, SynthDefs) and ser
 │  ├── rhythm.py (BPM)            │  └── unified.py (atomic ops)   │
 │  ├── tonal.py (key)             │                                │
 │  ├── classifier.py (ML)         │  Generators                    │
-│  ├── embeddings.py (128-dim)    │  ├── patterns.py (Magenta)     │
+│  ├── embeddings.py (128-dim)    │  ├── patterns.py (algorithmic) │
 │  └── synthdef.py (SC parser)    │  ├── synths.py (evolution)     │
 │                                 │  └── lineage.py (tracking)     │
 ├─────────────────────────────────────────────────────────────────┤
@@ -301,6 +301,19 @@ python benchmarks/quick_test.py
 - `librosa` - Audio loading (with native sample rate)
 - `lancedb` - Vector similarity search
 - `sqlalchemy` - SQL ORM
-- `mido` - MIDI file handling
+- `mido` - MIDI file handling and pattern generation
 - `mcp` - Model Context Protocol SDK
 - `typer` + `rich` - CLI framework
+
+## Pattern Generation
+
+Pattern generation uses algorithmic methods (no ML dependencies):
+
+- **Euclidean rhythms**: Bjorklund's algorithm for drum patterns
+- **Scale-based melody**: Random walks within musical scales
+- **Style templates**: Pre-defined patterns for house, techno, breakbeat, etc.
+
+All patterns output:
+- MIDI data (bytes, via mido)
+- TidalCycles code (string)
+- SuperCollider Pbind code (string)
