@@ -372,7 +372,6 @@ class TestRanking:
         assert len(top_5) == 5
 
 
-@pytest.mark.skipif(not MAGENTA_AVAILABLE, reason="Magenta not installed")
 class TestPopulationEvolution:
     """Tests for evolving pattern populations."""
 

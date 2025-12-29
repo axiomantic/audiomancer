@@ -254,7 +254,7 @@ class TestBatchOperations:
     """Test batch operations are efficient and atomic."""
 
     def test_batch_add_multiple(self, vector_store):
-        """Batch add inserts all items."""
+        """Batch add inserts all items with correct values."""
         items = [
             ("smpl_abc123", [0.1] * 128),
             ("smpl_def456", [0.2] * 128),
@@ -263,10 +263,12 @@ class TestBatchOperations:
 
         vector_store.add_embeddings_batch(items)
 
-        # Verify all inserted
-        assert vector_store.get_embedding("smpl_abc123") is not None
-        assert vector_store.get_embedding("smpl_def456") is not None
-        assert vector_store.get_embedding("smpl_ghi789") is not None
+        # Verify all inserted WITH CORRECT VALUES
+        for sample_id, expected in items:
+            retrieved = vector_store.get_embedding(sample_id)
+            assert retrieved is not None
+            assert len(retrieved) == 128
+            assert retrieved[0] == pytest.approx(expected[0], abs=0.01)
 
     def test_batch_add_empty_list(self, vector_store):
         """Batch add with empty list is no-op."""

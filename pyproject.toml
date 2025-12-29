@@ -2,7 +2,7 @@
 name = "audiomancer"
 version = "0.1.0"
 description = "MCP server for music production metadata, analysis, and generation"
-requires-python = ">=3.11,<3.13"
+requires-python = ">=3.10,<3.13"
 license = {text = "MIT"}
 authors = [{name = "Your Name"}]
 readme = "README.md"
@@ -35,9 +35,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Generation features (optional due to dependency conflicts with librosa)
+# Generation features (requires Python 3.9 for best compatibility)
 generation = [
-    "tensorflow>=2.13.0,<2.14",
+    "tensorflow>=2.10.0,<2.13",
     "magenta>=2.1.0,<3",
 ]
 dev = [

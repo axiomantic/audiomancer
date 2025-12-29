@@ -54,16 +54,26 @@ class TestAtomicAdd:
     """Test atomic add operations."""
 
     def test_add_sample_with_embedding_success(self, temp_storage):
-        """Both sample and embedding are added together."""
+        """Both sample and embedding are added together with correct values."""
         sample = make_sample("smpl_abc123", "hash123")
         embedding = make_embedding(0.1)
 
         sample_id = temp_storage.add_sample_with_embedding(sample, embedding)
 
-        # Verify both stores updated
+        # Verify sample ID
         assert sample_id == "smpl_abc123"
-        assert temp_storage.sample_store.get(sample_id) is not None
-        assert temp_storage.vector_store.get_embedding(sample_id) is not None
+
+        # Verify sample data, not just existence
+        retrieved_sample = temp_storage.sample_store.get(sample_id)
+        assert retrieved_sample is not None
+        assert retrieved_sample["file_hash"] == "hash123"
+        assert retrieved_sample["duration_ms"] == 250.5
+
+        # Verify embedding values, not just existence
+        retrieved_emb = temp_storage.vector_store.get_embedding(sample_id)
+        assert retrieved_emb is not None
+        assert len(retrieved_emb) == 128
+        assert retrieved_emb[0] == pytest.approx(0.1, abs=0.01)
 
     def test_add_rollback_on_invalid_embedding(self, temp_storage):
         """Sample is rolled back if embedding validation fails."""
@@ -109,7 +119,7 @@ class TestAtomicBatch:
     """Test atomic batch operations."""
 
     def test_batch_add_success(self, temp_storage):
-        """All samples and embeddings added atomically."""
+        """All samples and embeddings added atomically with correct values."""
         items = [
             (make_sample("smpl_abc123", "hash1", "/test/kick1.wav"), make_embedding(0.1)),
             (make_sample("smpl_def456", "hash2", "/test/kick2.wav"), make_embedding(0.2)),
@@ -122,13 +132,18 @@ class TestAtomicBatch:
         assert len(sample_ids) == 3
         assert sample_ids == ["smpl_abc123", "smpl_def456", "smpl_ghi789"]
 
-        # Check all in metadata store
-        for sample_id in sample_ids:
-            assert temp_storage.sample_store.get(sample_id) is not None
+        # Verify samples with correct values (spot check first item)
+        retrieved_sample = temp_storage.sample_store.get("smpl_abc123")
+        assert retrieved_sample is not None
+        assert retrieved_sample["file_hash"] == "hash1"
+        assert retrieved_sample["file_path"] == "/test/kick1.wav"
 
-        # Check all in vector store
-        for sample_id in sample_ids:
-            assert temp_storage.vector_store.get_embedding(sample_id) is not None
+        # Verify embeddings with correct values
+        for (sample, expected_emb), sample_id in zip(items, sample_ids):
+            retrieved_emb = temp_storage.vector_store.get_embedding(sample_id)
+            assert retrieved_emb is not None
+            assert len(retrieved_emb) == 128
+            assert retrieved_emb[0] == pytest.approx(expected_emb[0], abs=0.01)
 
     def test_batch_rollback_on_invalid_embedding(self, temp_storage):
         """Entire batch rolled back if any embedding invalid."""

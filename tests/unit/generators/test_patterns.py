@@ -136,7 +136,6 @@ class TestKeyParsing:
         assert "X" in exc_info.value.details["key"]
 
 
-@pytest.mark.skipif(not MAGENTA_AVAILABLE, reason="Magenta not installed")
 class TestDrumGeneration:
     """Tests for drum pattern generation."""
 
@@ -147,7 +146,7 @@ class TestDrumGeneration:
         assert pattern.type == "drums"
         assert pattern.bpm == 125.0
         assert pattern.bars == 4
-        assert pattern.generation_method == "generated"
+        assert pattern.generation_method == "algorithmic"
         assert pattern.parent_ids == []
         assert 'd1 $ sound' in pattern.tidal_code
         assert 'Pdef' in pattern.sc_code
@@ -179,7 +178,6 @@ class TestDrumGeneration:
         assert pattern.type == "drums"
 
 
-@pytest.mark.skipif(not MAGENTA_AVAILABLE, reason="Magenta not installed")
 class TestMelodyGeneration:
     """Tests for melody pattern generation."""
 
@@ -192,7 +190,7 @@ class TestMelodyGeneration:
         assert pattern.bars == 4
         assert pattern.key == "C"
         assert pattern.scale == "major"
-        assert pattern.generation_method == "generated"
+        assert pattern.generation_method == "algorithmic"
 
     def test_generate_melody_scales(self):
         """Test different scale types."""
@@ -225,7 +223,6 @@ class TestMelodyGeneration:
         assert pattern.type == "melody"
 
 
-@pytest.mark.skipif(not MAGENTA_AVAILABLE, reason="Magenta not installed")
 class TestBassGeneration:
     """Tests for bass pattern generation."""
 
@@ -238,7 +235,7 @@ class TestBassGeneration:
         assert pattern.bars == 8
         assert pattern.key == "F#"
         assert pattern.scale == "minor"  # Default
-        assert pattern.generation_method == "generated"
+        assert pattern.generation_method == "algorithmic"
 
     def test_generate_bass_styles(self):
         """Test different bass styles."""
@@ -254,7 +251,6 @@ class TestBassGeneration:
         assert pattern.type == "bass"
 
 
-@pytest.mark.skipif(not MAGENTA_AVAILABLE, reason="Magenta not installed")
 class TestHumanization:
     """Tests for pattern humanization."""
 
@@ -292,46 +288,57 @@ class TestHumanization:
 
 
 class TestMagentaNotAvailable:
-    """Tests for graceful degradation when Magenta is not installed."""
+    """Tests that pattern generation works without Magenta using algorithmic methods."""
 
     @patch('audiomancer.generators.patterns.MAGENTA_AVAILABLE', False)
     def test_drum_generation_without_magenta(self):
-        """Test that drum generation fails gracefully without Magenta."""
-        with pytest.raises(ModelLoadError) as exc_info:
-            generate_drums()
+        """Test that drum generation works with algorithmic methods when Magenta is not available."""
+        pattern = generate_drums(style="house", bars=2)
 
-        assert "Magenta not available" in str(exc_info.value)
-        assert "magenta" in exc_info.value.details["package"]
+        assert pattern is not None
+        assert pattern.type == "drums"
+        assert pattern.bars == 2
+        assert pattern.generation_method == "algorithmic"
+        assert len(pattern.midi_data) > 0
+        assert "sound" in pattern.tidal_code
+        assert "Pdef" in pattern.sc_code
 
     @patch('audiomancer.generators.patterns.MAGENTA_AVAILABLE', False)
     def test_melody_generation_without_magenta(self):
-        """Test that melody generation fails gracefully without Magenta."""
-        with pytest.raises(ModelLoadError) as exc_info:
-            generate_melody()
+        """Test that melody generation works with algorithmic methods when Magenta is not available."""
+        pattern = generate_melody(key="C", scale="major", bars=2)
 
-        assert "Magenta not available" in str(exc_info.value)
+        assert pattern is not None
+        assert pattern.type == "melody"
+        assert pattern.key == "C"
+        assert pattern.scale == "major"
+        assert pattern.generation_method == "algorithmic"
+        assert len(pattern.midi_data) > 0
 
     @patch('audiomancer.generators.patterns.MAGENTA_AVAILABLE', False)
     def test_bass_generation_without_magenta(self):
-        """Test that bass generation fails gracefully without Magenta."""
-        with pytest.raises(ModelLoadError) as exc_info:
-            generate_bass()
+        """Test that bass generation works with algorithmic methods when Magenta is not available."""
+        pattern = generate_bass(key="F", style="synth", bars=2)
 
-        assert "Magenta not available" in str(exc_info.value)
+        assert pattern is not None
+        assert pattern.type == "bass"
+        assert pattern.key == "F"
+        assert pattern.generation_method == "algorithmic"
+        assert len(pattern.midi_data) > 0
 
     @patch('audiomancer.generators.patterns.MAGENTA_AVAILABLE', False)
     def test_humanize_without_magenta(self):
-        """Test that humanization fails gracefully without Magenta."""
-        # Create a fake pattern
-        pattern = Pattern(
-            pattern_id="test",
-            pattern_type="drums",
-            midi_data=b"",
-            tidal_code="",
-            sc_code="",
-            bpm=120.0,
-            bars=4,
-        )
+        """Test that humanization works with algorithmic methods when Magenta is not available."""
+        # Generate a pattern first
+        original = generate_drums(style="house", bars=2)
 
-        with pytest.raises(ModelLoadError):
-            humanize(pattern)
+        # Humanize it
+        humanized = humanize(original, amount=0.5)
+
+        assert humanized is not None
+        assert humanized.id != original.id
+        assert humanized.type == original.type
+        assert humanized.parent_ids == [original.id]
+        assert humanized.generation_method == "humanized"
+        assert humanized.mutation_amount == 0.5
+        assert len(humanized.midi_data) > 0
