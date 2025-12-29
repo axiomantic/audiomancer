@@ -1,0 +1,105 @@
+# Audiomancer Configuration Example
+# Copy this file to ~/.config/audiomancer/config.yaml and customize
+
+# Source directories for samples and synths
+sources:
+  samples:
+    # List of directories to scan for audio samples
+    # Paths support tilde expansion and are resolved to absolute paths
+    paths:
+      - ~/Music/Samples
+      - ~/Development/my-music/samples
+      - ~/Development/my-music/library
+
+  synths:
+    # List of directories containing SuperCollider synth definitions
+    paths:
+      - ~/Development/my-music/synths
+      - ~/.local/share/SuperCollider/synthdefs
+
+# Audio analysis configuration
+analysis:
+  # Maximum file size to analyze (MB)
+  # Files larger than this are skipped
+  max_file_size_mb: 50
+
+  # File patterns to skip during analysis
+  # Glob patterns for cache files, metadata, etc.
+  skip_patterns:
+    - "*.asd"       # Ableton Live analysis files
+    - "*.pkf"       # Native Instruments peak files
+    - "*.sfk"       # Sound Forge peak files
+    - ".DS_Store"   # macOS metadata
+    - "Thumbs.db"   # Windows thumbnails
+
+  # Embedding vector dimension
+  # Higher values = more detailed representation, more storage
+  # Range: 64-512
+  embedding_dim: 128
+
+  # Essentia model filename (relative to storage.models_path)
+  # Used for audio feature extraction
+  effnet_model: "discogs-effnet-bs64-1.pb"
+
+# SuperCollider integration
+supercollider:
+  # Path to sclang executable
+  # Leave empty for auto-detection
+  # Auto-detect searches:
+  #   - /usr/local/bin/sclang
+  #   - /usr/bin/sclang
+  #   - /Applications/SuperCollider.app/Contents/MacOS/sclang
+  sclang_path: null
+
+  # Whether to boot scsynth when starting SuperCollider
+  # Set to true if you want audiomancer to manage the audio server
+  boot_server: false
+
+  # Timeout for SuperCollider commands (seconds)
+  # Range: 1.0-30.0
+  timeout_seconds: 5.0
+
+# Data storage configuration
+storage:
+  # SQLite database path
+  # Stores sample metadata, analysis results, tags, etc.
+  db_path: ~/.local/share/audiomancer/audiomancer.db
+
+  # LanceDB embeddings storage
+  # Vector database for similarity search
+  embeddings_path: ~/.local/share/audiomancer/embeddings
+
+  # Pre-trained model storage
+  # Downloaded models for analysis and generation
+  models_path: ~/.local/share/audiomancer/models
+
+# Pattern and synth generation
+generation:
+  # Default tempo for generated patterns (BPM)
+  # Range: 60.0-200.0
+  default_bpm: 120.0
+
+  # Default number of bars for generated patterns
+  # Range: 1-32
+  default_bars: 4
+
+  # Timeout for generation inference (seconds)
+  # Range: 5.0-120.0
+  inference_timeout: 30.0
+
+# Logging configuration
+logging:
+  # Console log level
+  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: WARNING
+
+  # File log level
+  # Typically more verbose than console
+  file_level: DEBUG
+
+  # Directory for log files
+  log_dir: ~/.local/share/audiomancer/logs
+
+  # Maximum days to keep log files
+  # Range: 1-30
+  max_days: 7
