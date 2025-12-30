@@ -14,6 +14,42 @@
 
 ## Phase 1: Configuration System Foundation
 
+### Task 0: Verify Pydantic v2 dependencies and API availability
+
+**Files:**
+- Read: `/Users/elijahrutschman/Development/audiomancer/pyproject.toml`
+- Test: Python environment verification
+
+**Step 1: Verify Pydantic v2 is installed**
+
+Run: `python -c "import pydantic; print(f'Pydantic version: {pydantic.__version__}')"`
+Expected: Version 2.x.x
+
+**Step 2: Verify PrivateAttr is available**
+
+Run: `python -c "from pydantic import PrivateAttr; print('PrivateAttr available')"`
+Expected: "PrivateAttr available"
+
+**Step 3: Verify model_validate and model_dump API**
+
+Run:
+```bash
+python -c "from pydantic import BaseModel; m = BaseModel(); print(hasattr(m, 'model_validate')); print(hasattr(m, 'model_dump'))"
+```
+Expected: True True
+
+**Step 4: Check pyproject.toml dependencies**
+
+Run: `grep -A5 'dependencies' /Users/elijahrutschman/Development/audiomancer/pyproject.toml`
+Expected: Should show pydantic>=2.0.0
+
+**Step 5: Document Pydantic v2 requirement**
+
+If pydantic<2.0.0, add note to implementation plan about required upgrade.
+If pydantic>=2.0.0, proceed with confidence.
+
+---
+
 ### Task 1: Add config helper utilities to config.py
 
 **Files:**
@@ -117,9 +153,14 @@ git commit -m "feat(config): add XDG-compliant config and data directory helpers
 
 ### Task 2: Add deep_merge_dicts utility
 
+**Worktree:** `feature/deep-merge-dicts` (parallel with Task 3)
+**Merge Strategy:** Use smart-merge skill to combine Tasks 2 and 3 changes to config.py
+
 **Files:**
 - Modify: `/Users/elijahrutschman/Development/audiomancer/src/audiomancer/config.py`
 - Test: `/Users/elijahrutschman/Development/audiomancer/tests/unit/test_config.py`
+
+**Note:** This task modifies config.py in parallel with Task 3. Both branches will be merged using the smart-merge skill before Task 4.
 
 **Step 1: Write test for deep_merge_dicts**
 
@@ -244,9 +285,14 @@ git commit -m "feat(config): add deep_merge_dicts for config inheritance"
 
 ### Task 3: Add find_project_config function
 
+**Worktree:** `feature/find-project-config` (parallel with Task 2)
+**Merge Strategy:** Use smart-merge skill to combine Tasks 2 and 3 changes to config.py
+
 **Files:**
 - Modify: `/Users/elijahrutschman/Development/audiomancer/src/audiomancer/config.py`
 - Test: `/Users/elijahrutschman/Development/audiomancer/tests/unit/test_config.py`
+
+**Note:** This task modifies config.py in parallel with Task 2. Both branches will be merged using the smart-merge skill before Task 4.
 
 **Step 1: Write tests for find_project_config**
 
@@ -551,7 +597,49 @@ git commit -m "feat(config): add merge_config for 3-tier inheritance"
 
 **Files:**
 - Modify: `/Users/elijahrutschman/Development/audiomancer/src/audiomancer/config.py`
+- Modify: `/Users/elijahrutschman/Development/audiomancer/src/audiomancer/errors.py` (if ConfigError missing)
 - Test: `/Users/elijahrutschman/Development/audiomancer/tests/unit/test_config.py`
+
+**Step 0a: Verify ConfigError exists in errors.py**
+
+Run: `grep -n "class ConfigError" /Users/elijahrutschman/Development/audiomancer/src/audiomancer/errors.py`
+Expected: Shows ConfigError class definition
+
+If not found, add to errors.py:
+```python
+class ConfigError(AudiomancerError):
+    """Configuration file or validation error."""
+    pass
+```
+
+**Step 0b: Document breaking change in load_config() signature**
+
+Run: `grep -rn "load_config(" /Users/elijahrutschman/Development/audiomancer/src/ --include="*.py" | grep -v test | grep -v "def load_config"`
+Expected: Shows all usages of load_config()
+
+Document migration for each usage:
+- OLD: `load_config()` - loads global config only
+- NEW: `load_config(project_path=None)` - loads with 3-tier inheritance
+
+Add backwards compatibility note to docstring:
+```python
+def load_config(project_path: Optional[Path] = None) -> AudiomancerConfig:
+    """Load config with 3-tier inheritance.
+
+    BREAKING CHANGE (v0.2.0):
+    - Signature changed from load_config() to load_config(project_path=None)
+    - Behavior changed: Now searches for project config by default
+    - Migration: Existing code calling load_config() will now search for .audiomancer.yaml
+    - To force global-only: Explicitly pass project_path=Path("/nonexistent")
+
+    Args:
+        project_path: Optional project directory. If None, searches upward
+                     from CWD for .audiomancer.yaml
+
+    Returns:
+        Merged configuration (builtin → global → project)
+    """
+```
 
 **Step 1: Write comprehensive tests for 3-tier load_config**
 
@@ -2220,24 +2308,79 @@ git commit -m "test(integration): add end-to-end project workflow tests"
 Run: `pytest tests/unit/ -xvs`
 Expected: All PASS
 
+If tests FAIL:
+- REQUIRED: Use systematic-debugging skill before making fixes
+- Do NOT guess at fixes - investigate root cause
+- Document failure reason and fix in commit message
+
 **Step 2: Run all integration tests**
 
 Run: `pytest tests/integration/ -xvs`
 Expected: All PASS
+
+If tests FAIL:
+- REQUIRED: Use systematic-debugging skill before making fixes
+- Check for environment-specific issues
+- Verify test assumptions are valid
 
 **Step 3: Run full test suite with coverage**
 
 Run: `pytest tests/ -xvs --cov=audiomancer --cov-report=term-missing`
 Expected: All tests PASS, coverage report shows new code covered
 
-**Step 4: Fix any failing tests**
+**Step 4: Verify no regressions in existing tests**
 
-If any tests fail, fix them before proceeding.
+Run:
+```bash
+# Test existing config loading (pre-project-scaffolding)
+pytest tests/unit/test_config.py -k "not project" -xvs
 
-**Step 5: Verify no regressions**
+# Test existing CLI commands
+pytest tests/unit/ -k "cli" -xvs
+
+# Test existing server functionality
+pytest tests/unit/ -k "server" -xvs
+```
+
+Expected: All existing tests still PASS
+If FAIL: CRITICAL REGRESSION - must fix before proceeding
+
+**Step 5: Fix any failing tests using systematic-debugging**
+
+If any tests fail:
+1. STOP - do not proceed with fixes immediately
+2. Use systematic-debugging skill to investigate
+3. Document hypothesis about failure cause
+4. Verify hypothesis with targeted tests
+5. Implement fix with verification
+6. Re-run full test suite
+
+**Step 6: Green Mirage Audit (Test Quality Verification)**
+
+REQUIRED: Use green-mirage-audit skill to verify test quality
+
+Run: Invoke green-mirage-audit skill with focus on:
+- Config inheritance tests (verify 3-tier merge actually works)
+- Template rendering tests (verify variables are actually substituted)
+- Project detection tests (verify upward search actually finds config)
+- Init command tests (verify files are actually created with correct content)
+
+The audit should answer:
+- Do tests actually validate correctness, or just check for "no crash"?
+- Are assertions specific enough to catch bugs?
+- Do mocks properly simulate real behavior?
+- Are edge cases actually tested?
+
+If audit finds "green mirages" (passing tests that don't validate correctness):
+- REQUIRED: Fix tests before proceeding
+- Add specific assertions
+- Add negative test cases
+- Verify actual behavior, not just absence of errors
+
+**Step 7: Final verification**
 
 Run: `pytest tests/ -x`
-Expected: All PASS
+Expected: All PASS with high confidence in test quality
 
 ---
 
@@ -2359,33 +2502,421 @@ git tag -a "project-scaffolding-complete" -m "Project scaffolding system impleme
 
 ---
 
+### Task 20: Update documentation (README, CHANGELOG, migration guide)
+
+**Files:**
+- Modify: `/Users/elijahrutschman/Development/audiomancer/README.md`
+- Create: `/Users/elijahrutschman/Development/audiomancer/docs/MIGRATION-v0.2.0.md`
+- Modify: `/Users/elijahrutschman/Development/audiomancer/CHANGELOG.md`
+
+**Step 1: Update README.md with project scaffolding examples**
+
+Add to README.md after installation section:
+
+```markdown
+## Quick Start
+
+### Create a new TidalCycles project
+
+```bash
+# Interactive mode (recommended)
+mkdir my-acid-jams && cd my-acid-jams
+audiomancer init
+
+# Non-interactive mode
+audiomancer init --name "my-project" --sample-source "~/Samples" --tidal --git --non-interactive
+```
+
+### Project structure
+
+```
+my-acid-jams/
+├── .audiomancer.yaml    # Project configuration
+├── .gitignore           # Git ignore rules
+├── .mcp.json            # Claude Code MCP server config
+├── CLAUDE.md            # TidalCycles reference for Claude
+├── session.tidal        # TidalCycles session file
+├── start_superdirt.scd  # SuperCollider startup script
+├── samples/             # Sample cache (gitignored)
+├── library/             # Enabled samples (gitignored)
+└── synths/              # Custom SuperCollider synths
+    ├── tb303.scd
+    ├── pad.scd
+    ├── lead.scd
+    └── fm_bass.scd
+```
+
+### Configuration inheritance
+
+audiomancer uses three-tier config inheritance:
+
+1. **Builtin defaults** - Sensible defaults for all settings
+2. **Global config** (`~/.config/audiomancer/config.yaml`) - Your personal defaults
+3. **Project config** (`.audiomancer.yaml`) - Project-specific overrides
+
+Example:
+```yaml
+# .audiomancer.yaml (project config)
+library:
+  source_dir: ~/Google Drive/Samples  # Override global default
+  max_file_size_mb: 20                # Override for this project
+
+sources:
+  samples:
+    paths:
+      - ./samples
+      - ./library
+```
+
+### MCP server project detection
+
+The MCP server automatically detects project context:
+
+1. `AUDIOMANCER_PROJECT_ROOT` environment variable (highest priority)
+2. Searches upward from CWD for `.audiomancer.yaml`
+3. Falls back to global config
+
+When running in Claude Code, `.mcp.json` sets `AUDIOMANCER_PROJECT_ROOT` automatically.
+```
+
+**Step 2: Create migration guide for v0.2.0**
+
+Create `/Users/elijahrutschman/Development/audiomancer/docs/MIGRATION-v0.2.0.md`:
+
+```markdown
+# Migration Guide: v0.1.x → v0.2.0
+
+## Breaking Changes
+
+### `load_config()` signature and behavior changed
+
+**OLD (v0.1.x):**
+```python
+from audiomancer.config import load_config
+
+config = load_config()  # Always loads global config only
+```
+
+**NEW (v0.2.0):**
+```python
+from audiomancer.config import load_config
+
+config = load_config()  # Searches for project config, then global
+# OR explicitly:
+config = load_config(project_path=None)  # Search for project
+config = load_config(project_path=Path("/path/to/project"))  # Specific project
+```
+
+**Impact:**
+- Existing code calling `load_config()` will now search for `.audiomancer.yaml`
+- If you have a `.audiomancer.yaml` in your CWD or parent directories, it will be loaded
+- This is usually desired behavior (project-aware config)
+
+**Migration:**
+- **For most code:** No changes needed - project detection is beneficial
+- **To force global-only:** Not recommended, but you can bypass project search by passing a non-existent path
+
+### New configuration fields
+
+**AudiomancerConfig now has:**
+- `_project_root: Optional[Path]` (private field, not in YAML)
+- `is_project_config` property (True if loaded from project)
+- `project_root` property (project root directory if available)
+
+**Example usage:**
+```python
+config = load_config()
+if config.is_project_config:
+    print(f"Running in project: {config.project_root}")
+else:
+    print("Running with global config only")
+```
+
+## New Features
+
+### 1. Project scaffolding with `audiomancer init`
+
+Create complete TidalCycles projects with a single command:
+
+```bash
+mkdir my-project && cd my-project
+audiomancer init  # Interactive prompts
+```
+
+### 2. Three-tier config inheritance
+
+Configuration files are now merged in this order:
+1. Builtin defaults
+2. Global config (`~/.config/audiomancer/config.yaml`)
+3. Project config (`.audiomancer.yaml`)
+
+### 3. MCP server project detection
+
+The MCP server automatically detects project context from:
+- `AUDIOMANCER_PROJECT_ROOT` environment variable
+- Upward search for `.audiomancer.yaml`
+
+### 4. Template system for project files
+
+New templates for:
+- `.audiomancer.yaml` - Project configuration
+- `session.tidal` - TidalCycles session
+- `start_superdirt.scd` - SuperCollider startup
+- `CLAUDE.md` - Reference documentation
+- `.mcp.json` - Claude Code integration
+- `.gitignore` - Git ignore rules
+- Custom synths (tb303, pad, lead, fm_bass)
+
+## Upgrade Steps
+
+1. **Update audiomancer:**
+   ```bash
+   pip install --upgrade audiomancer
+   ```
+
+2. **Verify Pydantic v2:**
+   ```bash
+   python -c "import pydantic; print(pydantic.__version__)"
+   ```
+   Expected: 2.x.x (if not, upgrade: `pip install --upgrade pydantic`)
+
+3. **Test existing code:**
+   ```bash
+   # Run your existing audiomancer code
+   # Verify it works as expected
+   ```
+
+4. **Create project configs (optional but recommended):**
+   ```bash
+   cd ~/your-existing-project
+   audiomancer init  # Creates .audiomancer.yaml and project files
+   ```
+
+5. **Update MCP server configs:**
+   If using Claude Code, update `.mcp.json` to set `AUDIOMANCER_PROJECT_ROOT`:
+   ```json
+   {
+     "mcpServers": {
+       "audiomancer": {
+         "command": "audiomancer",
+         "args": ["serve"],
+         "env": {
+           "AUDIOMANCER_PROJECT_ROOT": "/path/to/project"
+         }
+       }
+     }
+   }
+   ```
+
+## Compatibility
+
+- **Python:** No change (still Python 3.11+)
+- **Dependencies:** Pydantic upgraded to v2.x (from v1.x)
+- **Existing global configs:** Fully compatible, no changes needed
+- **Existing code:** Compatible, but benefits from new project detection
+
+## Rollback
+
+If you encounter issues, you can rollback:
+
+```bash
+pip install audiomancer==0.1.x  # Replace x with your previous version
+```
+
+## Questions?
+
+Open an issue: https://github.com/elijahr/audiomancer/issues
+```
+
+**Step 3: Update CHANGELOG.md**
+
+Add to `/Users/elijahrutschman/Development/audiomancer/CHANGELOG.md`:
+
+```markdown
+## [0.2.0] - 2025-12-30
+
+### Added
+- **Project scaffolding system** - Create complete TidalCycles projects with `audiomancer init`
+- **Three-tier config inheritance** - Builtin → global → project config merging
+- **Template system** - Project files generated from templates with variable substitution
+- **MCP server project detection** - Auto-detect project from `AUDIOMANCER_PROJECT_ROOT` or upward search
+- **New config functions**:
+  - `find_project_config()` - Search upward for `.audiomancer.yaml`
+  - `merge_config()` - Deep merge config dictionaries
+  - `deep_merge_dicts()` - Recursive dict merging with type safety
+  - `get_config_dir()` - XDG-compliant config directory
+  - `get_data_dir()` - XDG-compliant data directory
+- **AudiomancerConfig enhancements**:
+  - `_project_root` private field (tracks project directory)
+  - `is_project_config` property (True if loaded from project)
+  - `project_root` property (project root directory)
+- **Project templates**:
+  - `.audiomancer.yaml` - Project configuration
+  - `session.tidal` - TidalCycles starter session
+  - `start_superdirt.scd` - SuperCollider startup script
+  - `CLAUDE.md` - Complete TidalCycles reference for Claude
+  - `.mcp.json` - Claude Code MCP server configuration
+  - `.gitignore` - Sensible defaults for TidalCycles projects
+  - Custom synths: tb303 (acid bass), pad, lead, fm_bass
+
+### Changed
+- **BREAKING:** `load_config()` signature changed from `load_config()` to `load_config(project_path=None)`
+  - Now searches for project config by default
+  - See MIGRATION-v0.2.0.md for details
+- **BREAKING:** Upgraded to Pydantic v2.x (from v1.x)
+  - Uses `model_validate()` and `model_dump()` instead of `parse_obj()` and `dict()`
+  - Uses `PrivateAttr()` for internal fields
+- `init` command completely rewritten:
+  - Interactive prompts for project creation
+  - Non-interactive mode with flags and environment variables
+  - Git initialization support
+  - Template-based file generation
+
+### Fixed
+- XDG Base Directory Specification compliance for config paths
+- UTF-8 encoding explicitly set for all file I/O operations
+
+### Migration
+See [docs/MIGRATION-v0.2.0.md](docs/MIGRATION-v0.2.0.md) for detailed upgrade instructions.
+
+## [0.1.0] - 2025-12-XX
+
+### Added
+- Initial release
+- MCP server with sample library tools
+- SuperCollider integration
+- Sample analysis and embedding
+```
+
+**Step 4: Commit documentation**
+
+```bash
+git add README.md CHANGELOG.md docs/MIGRATION-v0.2.0.md
+git commit -m "docs: add v0.2.0 documentation (README, CHANGELOG, migration guide)"
+```
+
+---
+
+## Code Style Guidelines
+
+### Import Order
+
+All Python files MUST follow this import order:
+
+1. **Standard library imports** (sorted alphabetically)
+2. **Blank line**
+3. **Third-party imports** (sorted alphabetically)
+4. **Blank line**
+5. **Local application imports** (sorted alphabetically)
+
+**Example:**
+```python
+# Standard library
+import os
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, Optional
+
+# Third-party
+import yaml
+from pydantic import BaseModel, Field, PrivateAttr
+
+# Local application
+from audiomancer.config import load_config, merge_config
+from audiomancer.errors import ConfigError
+from audiomancer.templates import get_template_dir, render_template
+```
+
+### Test Fixture Consistency
+
+ALL tests MUST use `tmp_path` fixture (NOT `temp_dir` or other variants):
+
+```python
+# ✅ CORRECT
+def test_example(tmp_path, monkeypatch):
+    project_dir = tmp_path / "myproject"
+    project_dir.mkdir()
+    ...
+
+# ❌ WRONG
+def test_example(temp_dir, monkeypatch):  # temp_dir doesn't exist
+    ...
+```
+
+### UTF-8 Encoding
+
+ALL file I/O operations MUST explicitly specify UTF-8 encoding:
+
+```python
+# ✅ CORRECT
+content = path.read_text(encoding='utf-8')
+path.write_text(content, encoding='utf-8')
+
+with open(path, 'r', encoding='utf-8') as f:
+    data = f.read()
+
+# ❌ WRONG
+content = path.read_text()  # Platform-dependent encoding
+path.write_text(content)    # Platform-dependent encoding
+```
+
 ## Completion Checklist
 
 After executing all tasks, verify:
 
-- [ ] All unit tests pass (`pytest tests/unit/`)
-- [ ] All integration tests pass (`pytest tests/integration/`)
-- [ ] Manual testing checklist complete
-- [ ] Config system supports 3-tier inheritance
-- [ ] Template rendering works correctly
-- [ ] Init command creates complete projects
-- [ ] MCP server detects projects automatically
-- [ ] Git integration works
-- [ ] All commits have clear messages
+### Critical Requirements (Must Pass)
+- [ ] Task 0: Pydantic v2 verified (PrivateAttr, model_validate, model_dump)
+- [ ] Tasks 2 & 3: Worktrees merged successfully using smart-merge skill
+- [ ] Task 6: ConfigError exists or was added to errors.py
+- [ ] Task 6: load_config() breaking changes documented in docstring
+- [ ] Task 17: All unit tests pass (`pytest tests/unit/`)
+- [ ] Task 17: All integration tests pass (`pytest tests/integration/`)
+- [ ] Task 17: No regressions in existing tests (config, CLI, server)
+- [ ] Task 17: Green-mirage-audit completed with no issues
+- [ ] Task 20: README.md updated with project scaffolding examples
+- [ ] Task 20: MIGRATION-v0.2.0.md created with breaking changes
+- [ ] Task 20: CHANGELOG.md updated with v0.2.0 changes
+
+### Functional Requirements
+- [ ] Config system supports 3-tier inheritance (builtin → global → project)
+- [ ] Template rendering works correctly (variables substituted)
+- [ ] Init command creates complete projects (interactive and non-interactive)
+- [ ] MCP server detects projects automatically (env var + upward search)
+- [ ] Git integration works (git init + .gitignore)
+- [ ] All template files created with correct content
+
+### Quality Requirements
+- [ ] All commits have clear, descriptive messages
 - [ ] No regressions in existing functionality
+- [ ] Test fixture usage is consistent (tmp_path only)
+- [ ] Import order follows style guidelines
+- [ ] UTF-8 encoding explicitly specified for all file I/O
+- [ ] systematic-debugging used for any test failures
+- [ ] Green-mirage-audit passed (tests actually validate correctness)
+
+### Documentation Requirements
+- [ ] Manual testing checklist complete (Task 18)
+- [ ] README has quick start guide
+- [ ] Migration guide complete and accurate
+- [ ] CHANGELOG entries detailed and helpful
+- [ ] Breaking changes clearly documented
 
 ## Parallel Execution Groups
 
-**Group 1 (Independent - can run in parallel):**
+**Group 0 (Prerequisites - must run first):**
+- Task 0: Verify Pydantic v2 dependencies
+
+**Group 1 (Independent - can run in parallel after Group 0):**
 - Task 1: Config helper utilities
 - Task 7: Create templates package structure
 
 **Group 2 (Depends on Group 1):**
-- Task 2: deep_merge_dicts
-- Task 3: find_project_config
+- Task 2: deep_merge_dicts (worktree: feature/deep-merge-dicts)
+- Task 3: find_project_config (worktree: feature/find-project-config)
 - Task 8: Template rendering tests
+- **MERGE POINT:** Use smart-merge skill to combine Tasks 2 & 3 worktrees
 
-**Group 3 (Depends on Group 2):**
+**Group 3 (Depends on Group 2 merge):**
 - Task 4: _project_root attribute
 - Task 5: merge_config
 - Task 9: Project template files
@@ -2393,7 +2924,7 @@ After executing all tasks, verify:
 - Task 11: Synth files
 
 **Group 4 (Depends on Group 3):**
-- Task 6: Rewrite load_config
+- Task 6: Rewrite load_config (includes ConfigError verification and breaking change docs)
 - Task 12: Scaffolding functions
 
 **Group 5 (Depends on Group 4):**
@@ -2404,9 +2935,18 @@ After executing all tasks, verify:
 - Task 15: Update server main()
 - Task 16: Integration tests
 
-**Group 7 (Final - sequential):**
-- Task 17: Full test suite
+**Group 7 (Final - sequential with quality gates):**
+- Task 17: Full test suite (includes regression tests and green-mirage-audit)
 - Task 18: Manual testing
 - Task 19: Final verification
+- Task 20: Documentation (README, CHANGELOG, migration guide)
 
-Total estimated time: 10-15 hours
+**Critical Quality Gates:**
+1. After Task 0: Verify Pydantic v2 available before proceeding
+2. After Tasks 2 & 3: Use smart-merge skill (do NOT manually merge)
+3. After Task 6: Verify ConfigError exists and breaking changes documented
+4. After Task 17 Step 6: Green-mirage-audit must pass
+5. After Task 17: No regressions allowed
+6. After Task 20: All documentation must be complete
+
+Total estimated time: 12-18 hours (including quality verification)
