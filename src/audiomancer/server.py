@@ -12,7 +12,7 @@ from typing import Optional, Any
 
 from mcp.server import Server
 from mcp.server.models import InitializationOptions
-from mcp.types import Tool, TextContent
+from mcp.types import Tool, TextContent, ServerCapabilities, ToolsCapability
 import mcp.server.stdio
 
 from audiomancer.storage.unified import UnifiedSampleStorage
@@ -893,7 +893,10 @@ async def main():
             write,
             InitializationOptions(
                 server_name="audiomancer",
-                server_version="0.1.0"
+                server_version="0.1.0",
+                capabilities=ServerCapabilities(
+                    tools=ToolsCapability(listChanged=False)
+                )
             )
         )
 
