@@ -108,14 +108,19 @@ class TestAudiomancerConfig:
 class TestConfigPersistence:
     """Tests for config save/load."""
 
-    def test_save_and_load_roundtrip(self, temp_dir):
-        """Config should survive save/load cycle."""
-        config_path = temp_dir / "config.yaml"
+    def test_save_and_load_roundtrip(self, temp_dir, monkeypatch):
+        """Config should survive save/load cycle via global config."""
+        # Set up home directory
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.setattr(Path, "home", lambda: temp_dir)
+
+        # Save to global config location
+        config_path = temp_dir / ".config" / "audiomancer" / "config.yaml"
         original = AudiomancerConfig()
         original.generation.default_bpm = 140.0
 
         save_config(original, config_path)
-        loaded = load_config(config_path)
+        loaded = load_config()
 
         assert loaded.generation.default_bpm == 140.0
 
@@ -129,52 +134,76 @@ class TestConfigPersistence:
         assert config_path.exists()
         assert config_path.parent.exists()
 
-    def test_missing_config_returns_defaults(self, temp_dir):
+    def test_missing_config_returns_defaults(self, temp_dir, monkeypatch):
         """Missing config file should return defaults."""
-        config = load_config(temp_dir / "nonexistent.yaml")
+        # Set up environment with no configs
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.setattr(Path, "home", lambda: temp_dir)
+        monkeypatch.setattr("audiomancer.config.Path.cwd", lambda: temp_dir)
+
+        config = load_config()
         assert isinstance(config, AudiomancerConfig)
         assert config.analysis.max_file_size_mb == 50
 
-    def test_load_preserves_all_sections(self, temp_dir):
-        """Load should preserve all config sections."""
-        config_path = temp_dir / "config.yaml"
+    def test_load_preserves_all_sections(self, temp_dir, monkeypatch):
+        """Load should preserve all config sections via global config."""
+        # Set up home directory
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.setattr(Path, "home", lambda: temp_dir)
+
+        config_path = temp_dir / ".config" / "audiomancer" / "config.yaml"
         original = AudiomancerConfig()
         original.analysis.max_file_size_mb = 100
         original.generation.default_bpm = 140.0
         original.logging.level = "DEBUG"
 
         save_config(original, config_path)
-        loaded = load_config(config_path)
+        loaded = load_config()
 
         assert loaded.analysis.max_file_size_mb == 100
         assert loaded.generation.default_bpm == 140.0
         assert loaded.logging.level == "DEBUG"
 
-    def test_partial_config_uses_defaults(self, temp_dir):
+    def test_partial_config_uses_defaults(self, temp_dir, monkeypatch):
         """Partial config should fill missing values with defaults."""
-        config_path = temp_dir / "config.yaml"
+        # Set up home directory
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.setattr(Path, "home", lambda: temp_dir)
 
-        # Write minimal config
+        config_path = temp_dir / ".config" / "audiomancer" / "config.yaml"
+        config_path.parent.mkdir(parents=True)
+
+        # Write minimal global config
         config_path.write_text("generation:\n  default_bpm: 150.0\n")
 
-        loaded = load_config(config_path)
+        loaded = load_config()
 
         # Custom value preserved
         assert loaded.generation.default_bpm == 150.0
         # Defaults filled in
         assert loaded.analysis.max_file_size_mb == 50
 
-    def test_invalid_yaml_raises_error(self, temp_dir):
+    def test_invalid_yaml_raises_error(self, temp_dir, monkeypatch):
         """Invalid YAML should raise appropriate error."""
-        config_path = temp_dir / "config.yaml"
+        # Set up home directory
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.setattr(Path, "home", lambda: temp_dir)
+
+        config_path = temp_dir / ".config" / "audiomancer" / "config.yaml"
+        config_path.parent.mkdir(parents=True)
         config_path.write_text("invalid: yaml: content: {")
 
         with pytest.raises(Exception):
-            load_config(config_path)
+            load_config()
 
-    def test_config_with_comments_preserved(self, temp_dir):
+    def test_config_with_comments_preserved(self, temp_dir, monkeypatch):
         """Comments in config should not break loading."""
-        config_path = temp_dir / "config.yaml"
+        # Set up home directory
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.setattr(Path, "home", lambda: temp_dir)
+
+        config_path = temp_dir / ".config" / "audiomancer" / "config.yaml"
+        config_path.parent.mkdir(parents=True)
 
         # Write config with comments
         config_path.write_text("""
@@ -187,7 +216,7 @@ generation:
   default_bpm: 140.0  # Default tempo
 """)
 
-        loaded = load_config(config_path)
+        loaded = load_config()
         assert loaded.analysis.max_file_size_mb == 100
         assert loaded.generation.default_bpm == 140.0
 
@@ -394,6 +423,150 @@ class TestFindProjectConfig:
         # Search with max_depth=10 (should find it)
         result = find_project_config(start_path=deep, max_depth=10)
         assert result == config_file
+
+
+class TestLoadConfigThreeTier:
+    """Tests for load_config three-tier inheritance (BREAKING CHANGE)."""
+
+    def test_load_config_builtin_defaults(self, tmp_path, monkeypatch):
+        """load_config with no config files should return builtin defaults."""
+        # Set up environment with no config files
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        monkeypatch.setattr("audiomancer.config.Path.cwd", lambda: tmp_path)
+
+        # Call new load_config with no args
+        config = load_config()
+
+        # Should have builtin defaults
+        assert config.analysis.max_file_size_mb == 50
+        assert config.library.copy_workers == 16
+        assert config.generation.default_bpm == 120.0
+        assert config._project_root is None
+
+    def test_load_config_with_global(self, tmp_path, monkeypatch):
+        """load_config should merge global config over builtin defaults."""
+        # Set up home directory and remove XDG_CONFIG_HOME
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        monkeypatch.setattr("audiomancer.config.Path.cwd", lambda: tmp_path)
+
+        # Create global config
+        global_config_dir = tmp_path / ".config" / "audiomancer"
+        global_config_dir.mkdir(parents=True)
+        global_config_path = global_config_dir / "config.yaml"
+        global_config_path.write_text("""
+analysis:
+  max_file_size_mb: 100
+library:
+  copy_workers: 32
+""")
+
+        # Call load_config (no project path)
+        config = load_config()
+
+        # Global overrides builtin
+        assert config.analysis.max_file_size_mb == 100
+        assert config.library.copy_workers == 32
+        # Builtin default preserved
+        assert config.generation.default_bpm == 120.0
+        assert config._project_root is None
+
+    def test_load_config_with_project(self, tmp_path, monkeypatch):
+        """load_config should merge project config when project_path provided."""
+        # Set up home directory
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+        # Create project directory with .audiomancer.yaml
+        project_dir = tmp_path / "my-project"
+        project_dir.mkdir(parents=True)
+        project_config = project_dir / ".audiomancer.yaml"
+        project_config.write_text("""
+analysis:
+  max_file_size_mb: 75
+generation:
+  default_bpm: 140.0
+""")
+
+        # Call load_config with explicit project_path
+        config = load_config(project_path=project_dir)
+
+        # Project config overrides builtin
+        assert config.analysis.max_file_size_mb == 75
+        assert config.generation.default_bpm == 140.0
+        # Builtin default preserved
+        assert config.library.copy_workers == 16
+        # Project root should be set
+        assert config._project_root == project_dir
+
+    def test_load_config_full_inheritance(self, tmp_path, monkeypatch):
+        """load_config should merge all three tiers: builtin <- global <- project."""
+        # Set up home directory and remove XDG_CONFIG_HOME
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+        # Create global config
+        global_config_dir = tmp_path / ".config" / "audiomancer"
+        global_config_dir.mkdir(parents=True)
+        global_config_path = global_config_dir / "config.yaml"
+        global_config_path.write_text("""
+analysis:
+  max_file_size_mb: 100
+library:
+  copy_workers: 32
+generation:
+  default_bpm: 130.0
+""")
+
+        # Create project config
+        project_dir = tmp_path / "my-project"
+        project_dir.mkdir(parents=True)
+        project_config = project_dir / ".audiomancer.yaml"
+        project_config.write_text("""
+analysis:
+  max_file_size_mb: 75
+logging:
+  level: DEBUG
+""")
+
+        # Call load_config with project_path
+        config = load_config(project_path=project_dir)
+
+        # Project overrides global and builtin
+        assert config.analysis.max_file_size_mb == 75
+        assert config.logging.level == "DEBUG"
+        # Global overrides builtin
+        assert config.library.copy_workers == 32
+        assert config.generation.default_bpm == 130.0
+        # Project root set
+        assert config._project_root == project_dir
+
+    def test_load_config_auto_detects_project(self, tmp_path, monkeypatch):
+        """load_config should auto-detect .audiomancer.yaml when no project_path given."""
+        # Set up home directory and remove XDG_CONFIG_HOME
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+        # Create project directory structure
+        project_dir = tmp_path / "my-project"
+        project_dir.mkdir(parents=True)
+        project_config = project_dir / ".audiomancer.yaml"
+        project_config.write_text("""
+generation:
+  default_bpm: 150.0
+""")
+
+        # Create subdirectory and set it as cwd
+        subdir = project_dir / "src" / "nested"
+        subdir.mkdir(parents=True)
+        monkeypatch.setattr("audiomancer.config.Path.cwd", lambda: subdir)
+
+        # Call load_config without project_path (should auto-detect)
+        config = load_config()
+
+        # Should find project config
+        assert config.generation.default_bpm == 150.0
+        # Project root should be set to the directory containing .audiomancer.yaml
+        assert config._project_root == project_dir
 
 
 class TestMergeConfig:

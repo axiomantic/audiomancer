@@ -173,6 +173,49 @@ class AudiomancerConfig(BaseModel):
     _project_root: Optional[Path] = PrivateAttr(default=None)
 
 
+# Builtin default values for three-tier config system
+BUILTIN_DEFAULTS: Dict[str, Any] = {
+    "sources": {
+        "samples": {"paths": []},
+        "synths": {"paths": []}
+    },
+    "analysis": {
+        "max_file_size_mb": 50,
+        "skip_patterns": ["*.asd", "*.pkf"],
+        "embedding_dim": 128,
+        "effnet_model": "discogs-effnet-bs64-1.pb"
+    },
+    "supercollider": {
+        "sclang_path": None,
+        "boot_server": False,
+        "timeout_seconds": 5.0
+    },
+    "storage": {
+        "db_path": "~/.local/share/audiomancer/audiomancer.db",
+        "embeddings_path": "~/.local/share/audiomancer/embeddings",
+        "models_path": "~/.local/share/audiomancer/models"
+    },
+    "generation": {
+        "default_bpm": 120.0,
+        "default_bars": 4,
+        "inference_timeout": 30.0
+    },
+    "logging": {
+        "level": "WARNING",
+        "file_level": "DEBUG",
+        "log_dir": "~/.local/share/audiomancer/logs",
+        "max_days": 7
+    },
+    "library": {
+        "source_dir": "~/Library/CloudStorage/GoogleDrive-elijahr@gmail.com/My Drive/Manual Library/Music Production/Samples",
+        "project_root": "~/Development/my-music",
+        "auto_analyze": True,
+        "max_file_size_mb": 10,
+        "copy_workers": 16
+    }
+}
+
+
 def deep_merge_dicts(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
     """
     Recursively merge two dictionaries.
@@ -218,40 +261,83 @@ def get_config_path() -> Path:
     return get_config_dir() / "config.yaml"
 
 
-def load_config(config_path: Optional[Path] = None) -> AudiomancerConfig:
+def load_config(project_path: Optional[Path] = None) -> AudiomancerConfig:
     """
-    Load configuration from YAML file.
+    Load configuration using three-tier inheritance: builtin <- global <- project.
+
+    Merge order (later overrides earlier):
+    1. BUILTIN_DEFAULTS - Default values
+    2. Global config from ~/.config/audiomancer/config.yaml (if exists)
+    3. Project config from .audiomancer.yaml (if found)
 
     Args:
-        config_path: Optional path to config file. Uses default if not provided.
+        project_path: Optional path to project directory containing .audiomancer.yaml.
+                     If not provided, searches upward from current directory.
 
     Returns:
-        AudiomancerConfig instance
+        AudiomancerConfig instance with merged configuration
 
     Raises:
-        ConfigError: If config file exists but is invalid
+        ConfigError: If config files exist but are invalid
 
     Example:
+        >>> # Load with auto-detection
         >>> config = load_config()
-        >>> config.storage.db_path
-        PosixPath('/home/user/.local/share/audiomancer/audiomancer.db')
+        >>> # Load from specific project
+        >>> config = load_config(Path("/path/to/project"))
     """
     from audiomancer.errors import ConfigError
 
-    path = config_path or get_config_path()
+    # Start with builtin defaults
+    merged_config = BUILTIN_DEFAULTS.copy()
 
-    if not path.exists():
-        # Return defaults if no config file
-        return AudiomancerConfig()
+    # Load global config if it exists
+    global_config_path = get_config_path()
+    global_config_data: Optional[Dict[str, Any]] = None
+    if global_config_path.exists():
+        try:
+            with open(global_config_path) as f:
+                global_config_data = yaml.safe_load(f) or {}
+        except yaml.YAMLError as e:
+            raise ConfigError(f"Invalid YAML in global config file: {e}")
+        except Exception as e:
+            raise ConfigError(f"Failed to load global config: {e}")
 
-    try:
-        with open(path) as f:
-            data = yaml.safe_load(f) or {}
-        return AudiomancerConfig(**data)
-    except yaml.YAMLError as e:
-        raise ConfigError(f"Invalid YAML in config file: {e}")
-    except Exception as e:
-        raise ConfigError(f"Failed to load config: {e}")
+    # Determine project config path
+    project_config_path: Optional[Path] = None
+    project_root: Optional[Path] = None
+
+    if project_path is not None:
+        # Explicit project path provided
+        project_root = project_path.resolve()
+        candidate = project_root / ".audiomancer.yaml"
+        if candidate.exists():
+            project_config_path = candidate
+    else:
+        # Auto-detect project config
+        found_config = find_project_config()
+        if found_config is not None:
+            project_config_path = found_config
+            project_root = found_config.parent
+
+    # Load project config if found
+    project_config_data: Optional[Dict[str, Any]] = None
+    if project_config_path is not None:
+        try:
+            with open(project_config_path) as f:
+                project_config_data = yaml.safe_load(f) or {}
+        except yaml.YAMLError as e:
+            raise ConfigError(f"Invalid YAML in project config file: {e}")
+        except Exception as e:
+            raise ConfigError(f"Failed to load project config: {e}")
+
+    # Merge all tiers using merge_config
+    return merge_config(
+        builtin=merged_config,
+        global_config=global_config_data,
+        project_config=project_config_data,
+        project_root=project_root
+    )
 
 
 def save_config(config: AudiomancerConfig, config_path: Optional[Path] = None) -> None:
