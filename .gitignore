@@ -51,5 +51,8 @@ embeddings/
 .swarm/
 logs/
 
+# Git worktrees
+.worktrees/
+
 # macOS
 .DS_Store
