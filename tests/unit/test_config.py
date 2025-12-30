@@ -10,6 +10,7 @@ from audiomancer.config import (
     get_data_dir,
     get_config_path,
     deep_merge_dicts,
+    find_project_config,
 )
 
 
@@ -314,3 +315,55 @@ class TestDeepMergeDicts:
         override = {"b": None, "c": 3}
         result = deep_merge_dicts(base, override)
         assert result == {"a": 1, "b": None, "c": 3}
+
+
+class TestFindProjectConfig:
+    """Tests for find_project_config."""
+
+    def test_find_project_config_in_cwd(self, tmp_path):
+        """Should find .audiomancer.yaml in current working directory."""
+        config_file = tmp_path / ".audiomancer.yaml"
+        config_file.write_text("# test config")
+
+        result = find_project_config(start_path=tmp_path)
+
+        assert result == config_file
+
+    def test_find_project_config_in_parent(self, tmp_path):
+        """Should find .audiomancer.yaml in parent directory."""
+        config_file = tmp_path / ".audiomancer.yaml"
+        config_file.write_text("# test config")
+
+        # Start from nested subdirectory
+        nested = tmp_path / "subdir" / "nested"
+        nested.mkdir(parents=True)
+
+        result = find_project_config(start_path=nested)
+
+        assert result == config_file
+
+    def test_find_project_config_not_found(self, tmp_path):
+        """Should return None when .audiomancer.yaml not found."""
+        # No config file created
+
+        result = find_project_config(start_path=tmp_path)
+
+        assert result is None
+
+    def test_find_project_config_max_depth(self, tmp_path):
+        """Should respect max_depth limit when searching upward."""
+        # Create config file 5 levels up
+        config_file = tmp_path / ".audiomancer.yaml"
+        config_file.write_text("# test config")
+
+        # Create deeply nested directory
+        deep = tmp_path / "a" / "b" / "c" / "d" / "e"
+        deep.mkdir(parents=True)
+
+        # Search with max_depth=3 (should not find it)
+        result = find_project_config(start_path=deep, max_depth=3)
+        assert result is None
+
+        # Search with max_depth=10 (should find it)
+        result = find_project_config(start_path=deep, max_depth=10)
+        assert result == config_file
