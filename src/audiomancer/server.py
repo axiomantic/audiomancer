@@ -7,6 +7,7 @@ with structured JSON responses.
 
 import json
 import asyncio
+import logging
 from pathlib import Path
 from typing import Optional, Any
 
@@ -881,8 +882,17 @@ async def main():
     """Run the MCP server."""
     global storage, synth_store, library_manager
 
-    # Load config
-    config = load_config()
+    logger = logging.getLogger(__name__)
+
+    # Detect project root
+    project_path = detect_project_root()
+    if project_path is not None:
+        logger.info(f"Detected project at: {project_path}")
+    else:
+        logger.info("No project detected, using global config")
+
+    # Load config with project context
+    config = load_config(project_path=project_path)
     ensure_directories(config)
 
     # Initialize storage
