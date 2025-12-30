@@ -6,6 +6,9 @@ from audiomancer.config import (
     StorageConfig,
     load_config,
     save_config,
+    get_config_dir,
+    get_data_dir,
+    get_config_path,
 )
 
 
@@ -216,3 +219,31 @@ class TestStorageConfig:
         """Database path should end with .db or .sqlite."""
         config = StorageConfig()
         assert config.db_path.suffix in [".db", ".sqlite"]
+
+
+class TestConfigHelpers:
+    """Tests for config helper utilities."""
+
+    def test_get_config_dir_default(self, tmp_path, monkeypatch):
+        """Default config dir is ~/.config/audiomancer."""
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        assert get_config_dir() == tmp_path / ".config" / "audiomancer"
+
+    def test_get_config_dir_respects_xdg(self, tmp_path, monkeypatch):
+        """XDG_CONFIG_HOME is respected."""
+        custom_config = tmp_path / "custom_config"
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(custom_config))
+        assert get_config_dir() == custom_config / "audiomancer"
+
+    def test_get_data_dir(self, tmp_path, monkeypatch):
+        """Data dir is config_dir/data."""
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        assert get_data_dir() == tmp_path / ".config" / "audiomancer" / "data"
+
+    def test_get_config_path(self, tmp_path, monkeypatch):
+        """Config path is config_dir/config.yaml."""
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        assert get_config_path() == tmp_path / ".config" / "audiomancer" / "config.yaml"

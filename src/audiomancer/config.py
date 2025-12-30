@@ -171,10 +171,22 @@ class AudiomancerConfig(BaseModel):
     library: LibraryConfig = Field(default_factory=LibraryConfig)
 
 
+def get_config_dir() -> Path:
+    """Get audiomancer config directory (respects XDG_CONFIG_HOME)."""
+    xdg_config = os.environ.get("XDG_CONFIG_HOME")
+    if xdg_config:
+        return Path(xdg_config) / "audiomancer"
+    return Path.home() / ".config" / "audiomancer"
+
+
+def get_data_dir() -> Path:
+    """Get audiomancer data directory."""
+    return get_config_dir() / "data"
+
+
 def get_config_path() -> Path:
-    """Get the configuration file path."""
-    xdg_config = os.environ.get("XDG_CONFIG_HOME", "~/.config")
-    return Path(xdg_config).expanduser() / "audiomancer" / "config.yaml"
+    """Get configuration file path."""
+    return get_config_dir() / "config.yaml"
 
 
 def load_config(config_path: Optional[Path] = None) -> AudiomancerConfig:
