@@ -156,23 +156,20 @@ audiomancer doctor
 - Python 3.10+
 - SuperCollider (for SynthDef parsing)
 
-### Claude Code / Claude Desktop Setup
+### Claude Code Setup
 
-Add to your MCP config:
+```bash
+# Add globally (available in all projects)
+claude mcp add audiomancer --scope user -- audiomancer serve
 
-**Claude Code** (`~/.claude/settings.json`):
-```json
-{
-  "mcpServers": {
-    "audiomancer": {
-      "command": "audiomancer",
-      "args": ["serve"]
-    }
-  }
-}
+# Or add to current project only
+claude mcp add audiomancer -- audiomancer serve
 ```
 
-**Claude Desktop** (`~/.config/claude/claude_desktop_config.json`):
+### Claude Desktop Setup
+
+Add to `~/.config/claude/claude_desktop_config.json`:
+
 ```json
 {
   "mcpServers": {
