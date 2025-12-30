@@ -37,6 +37,20 @@ from audiomancer.errors import (
 from audiomancer.library import LibraryManager
 
 
+def detect_project_root() -> Optional[Path]:
+    """Detect project root by searching for .audiomancer.yaml from cwd.
+
+    Returns:
+        Path to project root (parent of .audiomancer.yaml) or None if not found.
+    """
+    from audiomancer.config import find_project_config
+
+    config_path = find_project_config()
+    if config_path is None:
+        return None
+    return config_path.parent
+
+
 server = Server("audiomancer")
 
 # Global storage instances (initialized in main)
