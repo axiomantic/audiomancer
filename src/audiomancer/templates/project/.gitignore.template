@@ -1,0 +1,33 @@
+# macOS
+.DS_Store
+
+# Claude Flow / Swarm
+.claude-flow/
+.swarm/
+logs/
+
+# Python
+__pycache__/
+*.pyc
+
+# Audio sample directories (managed by audiomancer)
+samples/
+library/
+
+# SuperCollider compiled files
+*.scx
+*.scxd
+
+# Haskell/Cabal
+dist-newstyle/
+.ghc.environment.*
+
+# IDE
+.vscode/
+.idea/
+
+# Audiomancer metadata
+.audiomancer/
+
+# Planning documents
+docs/plans/

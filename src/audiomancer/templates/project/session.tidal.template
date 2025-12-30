@@ -1,0 +1,31 @@
+-- {{ project_name }} - TidalCycles Session
+-- You edit here, I edit here. Evaluate with Shift+Enter (line) or Ctrl+Enter (block)
+
+-- Stop all
+hush
+
+-- Play on channel d1-d9
+
+-- Basic drum patterns
+d1 $ sound "bd bd bd bd"
+d2 $ sound "~ cp ~ cp"
+d3 $ sound "hh*8"
+d4 $ sound "~ ~ ~ oh"
+
+-- Stop a channel
+-- d1 $ silence
+-- d2 $ silence
+
+-- Melodic examples (uncomment to use)
+-- d1 $ n "0 3 7 12" # s "arpy"
+-- d2 $ n "0 0 12 0 3 0 7 0" # s "bass1"
+
+-- Pattern transformations
+-- d1 $ every 4 (rev) $ sound "bd sn bd cp"
+-- d2 $ slow 2 $ sound "hh*8"
+-- d3 $ fast 2 $ sound "arpy" # n "0 2 4 7"
+
+-- Effects
+-- d1 $ sound "bd*4" # lpf 800 # lpq 0.1
+-- d2 $ sound "arpy" # n "0 4 7" # delay 0.5 # delaytime 0.125
+-- d3 $ sound "hh*8" # gain 0.7 # pan (slow 4 sine)

@@ -1,0 +1,29 @@
+// Start SuperDirt for TidalCycles
+// Run this in SuperCollider before using TidalCycles
+
+SuperDirt.stop();
+
+(
+// Increase memory allocation for large sample libraries
+s.options.memSize = 8192 * 256; // 2 GB (default is 8192 = 8MB)
+s.options.numBuffers = 1024 * 1024; // 1M buffers for many samples
+s.options.maxNodes = 1024 * 64;
+
+s.waitForBoot {
+    ~dirt = SuperDirt(2, s);
+    ~dirt.loadSoundFiles;
+    // Load enabled samples from library folder (symlinks to samples/)
+    // Use: audiomancer library enable PACK to enable packs
+    ~dirt.loadSoundFiles("{{ project_root }}/library/*");
+    s.sync;
+    ~dirt.start(57120, 0 ! 12);
+
+    // Load custom synths
+    "{{ project_root }}/synths/tb303.scd".load;
+
+    "SuperDirt started on port 57120 with increased memory".postln;
+    "Samples loaded from: {{ project_root }}/library/".postln;
+    "Enable packs: audiomancer library enable PACK".postln;
+    "Custom synths: tb303".postln;
+};
+)

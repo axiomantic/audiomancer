@@ -170,3 +170,173 @@ def test_template_subdirectories_exist():
     assert project_dir.is_dir()
     assert synths_dir.exists()
     assert synths_dir.is_dir()
+
+
+def test_audiomancer_yaml_template_exists():
+    """.audiomancer.yaml template file exists."""
+    template_dir = get_template_dir()
+    template_file = template_dir / "project" / ".audiomancer.yaml.template"
+
+    assert template_file.exists()
+    assert template_file.is_file()
+
+
+def test_audiomancer_yaml_template_renders():
+    """.audiomancer.yaml template renders with project variables."""
+    template_dir = get_template_dir()
+    template_file = template_dir / "project" / ".audiomancer.yaml.template"
+
+    variables = {
+        "project_name": "test-project",
+        "sample_source": "/tmp/samples",
+    }
+
+    result = render_template(template_file, variables)
+
+    # Should contain project name
+    assert "test-project" in result
+    # Should contain sample source path
+    assert "/tmp/samples" in result
+    # Should be valid YAML-like structure
+    assert "project_name:" in result
+    assert "sample_sources:" in result
+
+
+def test_session_tidal_template_exists():
+    """session.tidal template file exists."""
+    template_dir = get_template_dir()
+    template_file = template_dir / "project" / "session.tidal.template"
+
+    assert template_file.exists()
+    assert template_file.is_file()
+
+
+def test_session_tidal_template_renders():
+    """session.tidal template renders with project variables."""
+    template_dir = get_template_dir()
+    template_file = template_dir / "project" / "session.tidal.template"
+
+    variables = {
+        "project_name": "acid-project",
+    }
+
+    result = render_template(template_file, variables)
+
+    # Should contain project name in header
+    assert "acid-project" in result
+    # Should have basic TidalCycles structure
+    assert "hush" in result
+    # Should have channel comments (d1-d4)
+    assert "d1" in result
+    assert "d2" in result
+    # Should have sound patterns
+    assert "sound" in result or "$" in result
+
+
+def test_start_superdirt_template_exists():
+    """start_superdirt.scd template file exists."""
+    template_dir = get_template_dir()
+    template_file = template_dir / "project" / "start_superdirt.scd.template"
+
+    assert template_file.exists()
+    assert template_file.is_file()
+
+
+def test_start_superdirt_template_renders():
+    """start_superdirt.scd template renders with project variables."""
+    template_dir = get_template_dir()
+    template_file = template_dir / "project" / "start_superdirt.scd.template"
+
+    variables = {
+        "project_root": "/tmp/test-project",
+    }
+
+    result = render_template(template_file, variables)
+
+    # Should contain project root path
+    assert "/tmp/test-project" in result
+    # Should have SuperDirt startup code
+    assert "SuperDirt" in result
+    assert "loadSoundFiles" in result
+    # Should reference library and synths directories
+    assert "library" in result.lower()
+    assert "synth" in result.lower()
+
+
+def test_claude_md_template_exists():
+    """CLAUDE.md template file exists."""
+    template_dir = get_template_dir()
+    template_file = template_dir / "project" / "CLAUDE.md.template"
+
+    assert template_file.exists()
+    assert template_file.is_file()
+
+
+def test_claude_md_template_renders():
+    """CLAUDE.md template renders with project variables."""
+    template_dir = get_template_dir()
+    template_file = template_dir / "project" / "CLAUDE.md.template"
+
+    variables = {
+        "project_name": "my-beats",
+    }
+
+    result = render_template(template_file, variables)
+
+    # Should contain project name
+    assert "my-beats" in result
+    # Should have TidalCycles reference content
+    assert "TidalCycles" in result
+    # Should have basic usage info
+    assert "session.tidal" in result or "hush" in result
+
+
+def test_mcp_json_template_exists():
+    """.mcp.json template file exists."""
+    template_dir = get_template_dir()
+    template_file = template_dir / "project" / ".mcp.json.template"
+
+    assert template_file.exists()
+    assert template_file.is_file()
+
+
+def test_mcp_json_template_renders():
+    """.mcp.json template renders with project variables."""
+    template_dir = get_template_dir()
+    template_file = template_dir / "project" / ".mcp.json.template"
+
+    variables = {
+        "project_root": "/home/user/project",
+    }
+
+    result = render_template(template_file, variables)
+
+    # Should contain project root
+    assert "/home/user/project" in result
+    # Should be JSON-like structure
+    assert "{" in result
+    assert "mcpServers" in result or "servers" in result
+
+
+def test_gitignore_template_exists():
+    """.gitignore template file exists."""
+    template_dir = get_template_dir()
+    template_file = template_dir / "project" / ".gitignore.template"
+
+    assert template_file.exists()
+    assert template_file.is_file()
+
+
+def test_gitignore_template_renders():
+    """.gitignore template renders."""
+    template_dir = get_template_dir()
+    template_file = template_dir / "project" / ".gitignore.template"
+
+    result = render_template(template_file, {})
+
+    # Should have standard ignore patterns
+    assert ".DS_Store" in result
+    # Should ignore sample directories
+    assert "samples" in result.lower() or "library" in result.lower()
+    # Should ignore Python cache
+    assert "__pycache__" in result or "*.pyc" in result

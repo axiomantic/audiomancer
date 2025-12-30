@@ -1,0 +1,35 @@
+# Audiomancer Project Configuration
+# Generated: {{ timestamp }}
+
+# Project information
+project_name: {{ project_name }}
+
+# Sample sources - paths to sample directories
+sample_sources:
+  - {{ sample_source }}
+
+# TidalCycles settings
+tidalcycles:
+  version: "1.10.1"
+  ghc_version: "9.6.7"
+
+# SuperCollider settings
+supercollider:
+  version: "3.13.0"
+  superdirt_port: 57120
+  memory_size: 2097152  # 2GB in KB (8192 * 256)
+  num_buffers: 1048576  # 1M buffers
+  max_nodes: 65536
+
+# Library management
+library:
+  enabled_packs: []  # Managed by library_manager.py
+  max_file_size_mb: 10
+  cache_directory: "samples"
+  enabled_directory: "library"
+
+# Custom synths
+synths:
+  directory: "synths"
+  enabled:
+    - "tb303"

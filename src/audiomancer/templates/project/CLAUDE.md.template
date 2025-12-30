@@ -1,0 +1,94 @@
+# {{ project_name }} - TidalCycles Live Coding Project
+
+## Project Context
+
+This is a TidalCycles live coding environment for algorithmic music. The user works in a GUI (VS Code for Tidal code and/or SuperCollider for lower-level SuperCollider code), and Claude edits the same files for AI-assisted collaboration.
+
+**Key principle**: User edits in their editor, Claude edits the same `.tidal` files. User evaluates when ready.
+
+## Startup Workflow
+
+1. Start SuperDirt: `open -a SuperCollider start_superdirt.scd`
+2. Open `session.tidal` in VS Code
+3. Evaluate with Shift+Enter (line) or Ctrl+Enter (block)
+
+## Key Files
+
+- `session.tidal` - Shared workspace (user + Claude edit this)
+- `start_superdirt.scd` - SuperDirt startup script (loads from library/)
+- `.audiomancer.yaml` - Project configuration
+- `samples/` - Local sample cache
+- `library/` - Enabled samples (what SuperDirt loads)
+- `synths/` - Custom SuperCollider synths
+
+## TidalCycles Basics
+
+```haskell
+-- Play on channel d1-d9
+d1 $ sound "bd bd bd bd"
+
+-- Stop a channel
+d1 $ silence
+
+-- Stop all
+hush
+
+-- Sample variations
+d1 $ sound "bd:0 bd:3 bd:1 bd:2"
+
+-- Multiple channels
+d1 $ sound "bd bd bd bd"
+d2 $ sound "hh*8"
+d3 $ sound "cp ~ cp ~"
+```
+
+## Sample Management
+
+```bash
+# List available sample packs
+audiomancer library list
+
+# Enable sample packs
+audiomancer library enable "808 Drum Kit" "909 drum kit"
+
+# Disable sample packs
+audiomancer library disable "808 Drum Kit"
+
+# Search for packs
+audiomancer library search techno
+```
+
+After changing enabled packs, restart SuperDirt.
+
+## Common Samples
+
+### Drums
+- `bd` - Bass drum/kicks
+- `sn` - Snares
+- `cp` - Claps
+- `hh` - Hi-hats
+- `ho` - Open hats
+- `hc` - Closed hats
+
+### Melodic
+- `arpy` - Arpeggio synth
+- `bass1` - Bass sounds
+- `pluck` - Plucked strings
+
+## Pattern Functions
+
+```haskell
+-- Rhythm
+d1 $ every 4 (rev) $ sound "bd sn bd cp"
+d2 $ slow 2 $ sound "hh*8"
+d3 $ fast 2 $ sound "arpy"
+
+-- Effects
+d1 $ sound "bd*4" # lpf 800 # lpq 0.1
+d2 $ sound "arpy" # delay 0.5
+d3 $ sound "hh*8" # gain 0.7
+```
+
+## Environment
+
+Source Haskell tools: `source ~/.ghcup/env`
