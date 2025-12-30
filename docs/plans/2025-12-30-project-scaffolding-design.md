@@ -42,6 +42,14 @@ Transform audiomancer from a global tool into a project-aware system with three-
 └─────────────────────────────────────────────────────────────┘
 ```
 
+**Dependencies:**
+
+- **Pydantic version**: `pydantic>=2.0.0` (required in pyproject.toml)
+- **Pydantic v2 API changes**:
+  - Use `model_validate()` instead of `parse_obj()`
+  - Use `model_dump()` instead of `dict()`
+  - Use `PrivateAttr()` for internal fields like `_project_root`
+
 **Config Loading Strategy:**
 
 ```python
@@ -54,6 +62,10 @@ def load_config(project_path: Optional[Path] = None) -> AudiomancerConfig:
 
     Returns:
         Merged configuration (builtin → global → project)
+
+    Note:
+        Uses Pydantic v2 API (model_validate, model_dump).
+        Requires pydantic>=2.0.0.
     """
     # 1. Start with builtin defaults
     config = AudiomancerConfig()
@@ -94,19 +106,42 @@ def find_project_config(start_path: Optional[Path] = None) -> Optional[Path]:
 def merge_config(base: AudiomancerConfig, overrides: dict) -> AudiomancerConfig:
     """Deep merge overrides into base config.
 
-    Uses pydantic's model_validate to ensure type safety.
+    Uses pydantic v2's model_dump() and model_validate() for type safety.
     """
     base_dict = base.model_dump()
     merged = deep_merge_dicts(base_dict, overrides)
-    return AudiomancerConfig(**merged)
+    return AudiomancerConfig.model_validate(merged)
 
-def deep_merge_dicts(base: dict, overrides: dict) -> dict:
-    """Recursively merge two dicts, with overrides taking precedence."""
+def deep_merge_dicts(base: dict, overrides: dict, _depth: int = 0) -> dict:
+    """Recursively merge two dicts, with overrides taking precedence.
+
+    Merge Behavior:
+    - Lists: REPLACED (not concatenated). Override list replaces base list entirely.
+    - Type conflicts: Override value used (e.g., override dict replaces base string).
+    - None values: Valid override. None in override replaces base value.
+    - Max recursion depth: 10 levels (prevents infinite recursion).
+
+    Args:
+        base: Base dictionary
+        overrides: Override dictionary (takes precedence)
+        _depth: Internal recursion depth counter
+
+    Returns:
+        Merged dictionary
+
+    Raises:
+        RecursionError: If merge depth exceeds 10 levels
+    """
+    if _depth > 10:
+        raise RecursionError("deep_merge_dicts exceeded maximum recursion depth of 10")
+
     result = base.copy()
     for key, value in overrides.items():
         if key in result and isinstance(result[key], dict) and isinstance(value, dict):
-            result[key] = deep_merge_dicts(result[key], value)
+            # Both are dicts: recurse
+            result[key] = deep_merge_dicts(result[key], value, _depth=_depth + 1)
         else:
+            # Override wins (lists replaced, type conflicts use override, None is valid)
             result[key] = value
     return result
 ```
@@ -271,7 +306,16 @@ def init(
     show_success_message(project_name=name, project_root=cwd)
 
 def ensure_global_config():
-    """Ensure ~/.config/audiomancer/config.yaml exists."""
+    """Ensure ~/.config/audiomancer/config.yaml exists.
+
+    Note:
+        get_config_dir() MUST be imported from config.py (single source of truth).
+        XDG_CONFIG_HOME environment variable MUST be respected per XDG Base Directory spec.
+        Falls back to ~/.config/audiomancer if XDG_CONFIG_HOME not set.
+
+    Implementation:
+        from audiomancer.config import get_config_dir  # Consolidation point
+    """
     config_dir = get_config_dir()
     data_dir = get_data_dir()
 
@@ -316,11 +360,40 @@ logging:
   log_dir: ~/.local/share/audiomancer/logs
   max_days: 7
 """
-        config_path.write_text(default_config)
+        config_path.write_text(default_config, encoding='utf-8')
         console.print(f"[green]✓[/green] Created global config: {config_path}")
 ```
 
 ### 3. Template System
+
+**UTF-8 Encoding Standard:**
+
+ALL file I/O operations in this project MUST use explicit UTF-8 encoding:
+
+```python
+# Reading files
+content = path.read_text(encoding='utf-8')
+with open(path, 'r', encoding='utf-8') as f:
+    data = f.read()
+
+# Writing files
+path.write_text(content, encoding='utf-8')
+with open(path, 'w', encoding='utf-8') as f:
+    f.write(content)
+```
+
+**Rationale:**
+- Cross-platform compatibility (Windows default is cp1252, not UTF-8)
+- Prevents UnicodeDecodeError on non-ASCII characters
+- Explicit is better than implicit (Python 3 default may vary)
+- Ensures template variables with special characters work correctly
+
+**Files requiring UTF-8:**
+- All templates (.template files)
+- All synth files (.scd)
+- Config files (.yaml)
+- Generated files (session.tidal, CLAUDE.md, etc.)
+- Any text file with potential non-ASCII content
 
 **Template Directory Structure:**
 
@@ -876,7 +949,8 @@ class AudiomancerConfig(BaseModel):
     # ... existing fields ...
 
     # Internal field to track project root (not in YAML)
-    _project_root: Optional[Path] = None
+    # Uses pydantic v2's PrivateAttr() for internal state
+    _project_root: Optional[Path] = PrivateAttr(default=None)
 
     @property
     def is_project_config(self) -> bool:
