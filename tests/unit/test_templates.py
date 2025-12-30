@@ -95,6 +95,70 @@ def test_get_template_variables():
     datetime.fromisoformat(variables["timestamp"])
 
 
+def test_render_template_special_chars(tmp_path):
+    """render_template handles paths with spaces and special characters."""
+    # Create a template with path-like content
+    template_file = tmp_path / "test.txt"
+    template_file.write_text("Path: {{ project_path }}\nFile: {{ file_name }}")
+
+    result = render_template(
+        template_file,
+        {
+            "project_path": "/tmp/my project/with spaces",
+            "file_name": "file-with-special_chars.txt"
+        }
+    )
+
+    assert result == "Path: /tmp/my project/with spaces\nFile: file-with-special_chars.txt"
+
+
+def test_render_template_multiline(tmp_path):
+    """render_template handles multi-line templates correctly."""
+    template_file = tmp_path / "test.txt"
+    template_content = """# {{ project_name }}
+
+Welcome to {{ project_name }}!
+
+This project was created on {{ date }}.
+Version: {{ version }}"""
+    template_file.write_text(template_content)
+
+    result = render_template(
+        template_file,
+        {
+            "project_name": "MyProject",
+            "date": "2025-12-30",
+            "version": "1.0.0"
+        }
+    )
+
+    expected = """# MyProject
+
+Welcome to MyProject!
+
+This project was created on 2025-12-30.
+Version: 1.0.0"""
+    assert result == expected
+
+
+def test_get_template_variables_paths_resolved():
+    """get_template_variables returns absolute paths."""
+    project_name = "test-project"
+    # Use relative paths as input
+    project_root = Path("relative/path/project")
+    sample_source = Path("relative/samples")
+
+    variables = get_template_variables(project_name, project_root, sample_source)
+
+    # Verify paths are absolute
+    assert Path(variables["project_root"]).is_absolute()
+    assert Path(variables["sample_source"]).is_absolute()
+
+    # Verify they match the absolute versions
+    assert variables["project_root"] == str(project_root.absolute())
+    assert variables["sample_source"] == str(sample_source.absolute())
+
+
 def test_template_subdirectories_exist():
     """Template subdirectories exist."""
     template_dir = get_template_dir()
