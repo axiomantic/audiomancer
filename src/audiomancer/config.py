@@ -272,3 +272,35 @@ def ensure_directories(config: AudiomancerConfig) -> None:
                 f"Cannot create directory: {directory}",
                 {"path": str(directory), "error": "Permission denied"}
             )
+
+
+def find_project_config(start_path: Optional[Path] = None, max_depth: int = 10) -> Optional[Path]:
+    """
+    Search upward from start_path for .audiomancer.yaml project config file.
+
+    Args:
+        start_path: Directory to start searching from. Defaults to current working directory.
+        max_depth: Maximum number of parent directories to search. Defaults to 10.
+
+    Returns:
+        Path to .audiomancer.yaml if found, None otherwise.
+
+    Example:
+        >>> config_path = find_project_config()
+        >>> if config_path:
+        ...     config = load_config(config_path)
+    """
+    current = (start_path or Path.cwd()).resolve()
+
+    for _ in range(max_depth):
+        config_file = current / ".audiomancer.yaml"
+        if config_file.exists():
+            return config_file
+
+        # Check if we've reached the root
+        parent = current.parent
+        if parent == current:
+            break
+        current = parent
+
+    return None
