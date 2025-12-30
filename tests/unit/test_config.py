@@ -394,3 +394,83 @@ class TestFindProjectConfig:
         # Search with max_depth=10 (should find it)
         result = find_project_config(start_path=deep, max_depth=10)
         assert result == config_file
+
+
+class TestMergeConfig:
+    """Tests for merge_config function."""
+
+    def test_merge_config_builtin_only(self):
+        """Builtin config only (no global or project overrides)."""
+        from audiomancer.config import merge_config
+
+        builtin = {
+            "analysis": {"max_file_size_mb": 50},
+            "library": {"copy_workers": 16}
+        }
+
+        result = merge_config(builtin)
+
+        assert result.analysis.max_file_size_mb == 50
+        assert result.library.copy_workers == 16
+        assert result._project_root is None
+
+    def test_merge_config_global_overrides_builtin(self):
+        """Global config overrides builtin defaults."""
+        from audiomancer.config import merge_config
+
+        builtin = {
+            "analysis": {"max_file_size_mb": 50},
+            "library": {"copy_workers": 16}
+        }
+        global_config = {
+            "analysis": {"max_file_size_mb": 100}
+        }
+
+        result = merge_config(builtin, global_config=global_config)
+
+        # Global overrides builtin
+        assert result.analysis.max_file_size_mb == 100
+        # Builtin value preserved where not overridden
+        assert result.library.copy_workers == 16
+        assert result._project_root is None
+
+    def test_merge_config_project_overrides_all(self):
+        """Project config takes precedence over global and builtin."""
+        from audiomancer.config import merge_config
+
+        builtin = {
+            "analysis": {"max_file_size_mb": 50},
+            "library": {"copy_workers": 16, "max_file_size_mb": 10}
+        }
+        global_config = {
+            "analysis": {"max_file_size_mb": 100}
+        }
+        project_config = {
+            "library": {"max_file_size_mb": 20}
+        }
+
+        result = merge_config(
+            builtin,
+            global_config=global_config,
+            project_config=project_config
+        )
+
+        # Project overrides global
+        assert result.library.max_file_size_mb == 20
+        # Global overrides builtin
+        assert result.analysis.max_file_size_mb == 100
+        # Builtin preserved where not overridden
+        assert result.library.copy_workers == 16
+
+    def test_merge_config_sets_project_root(self):
+        """merge_config sets _project_root when project_root provided."""
+        from audiomancer.config import merge_config
+
+        builtin = {
+            "analysis": {"max_file_size_mb": 50}
+        }
+        project_root = Path("/test/project/root")
+
+        result = merge_config(builtin, project_root=project_root)
+
+        assert result._project_root == project_root

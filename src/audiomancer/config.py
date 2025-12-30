@@ -333,3 +333,54 @@ def find_project_config(start_path: Optional[Path] = None, max_depth: int = 10) 
         current = parent
 
     return None
+
+
+def merge_config(
+    builtin: Dict[str, Any],
+    global_config: Optional[Dict[str, Any]] = None,
+    project_config: Optional[Dict[str, Any]] = None,
+    project_root: Optional[Path] = None
+) -> AudiomancerConfig:
+    """
+    Merge three-tier config hierarchy: builtin ← global ← project.
+
+    Merge order (later overrides earlier):
+    1. builtin (default values)
+    2. global_config (from ~/.config/audiomancer/config.yaml)
+    3. project_config (from .audiomancer.yaml)
+
+    Args:
+        builtin: Base configuration dictionary with default values
+        global_config: Optional global config overrides
+        project_config: Optional project-specific config overrides
+        project_root: Optional project root path (sets _project_root)
+
+    Returns:
+        AudiomancerConfig instance with merged configuration
+
+    Example:
+        >>> builtin = {"analysis": {"max_file_size_mb": 50}}
+        >>> global_cfg = {"analysis": {"max_file_size_mb": 100}}
+        >>> config = merge_config(builtin, global_config=global_cfg)
+        >>> config.analysis.max_file_size_mb
+        100
+    """
+    # Start with builtin
+    merged = builtin.copy()
+
+    # Apply global overrides
+    if global_config:
+        merged = deep_merge_dicts(merged, global_config)
+
+    # Apply project overrides
+    if project_config:
+        merged = deep_merge_dicts(merged, project_config)
+
+    # Create validated config
+    config = AudiomancerConfig.model_validate(merged)
+
+    # Set project root if provided
+    if project_root is not None:
+        config._project_root = project_root
+
+    return config
