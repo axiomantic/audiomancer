@@ -183,23 +183,38 @@ def test_audiomancer_yaml_template_exists():
 
 def test_audiomancer_yaml_template_renders():
     """.audiomancer.yaml template renders with project variables."""
+    import yaml
+
     template_dir = get_template_dir()
     template_file = template_dir / "project" / ".audiomancer.yaml.template"
 
     variables = {
         "project_name": "test-project",
         "sample_source": "/tmp/samples",
+        "project_root": "/tmp/test-project",
+        "timestamp": "2025-12-30T00:00:00",
     }
 
     result = render_template(template_file, variables)
 
-    # Should contain project name
-    assert "test-project" in result
-    # Should contain sample source path
-    assert "/tmp/samples" in result
-    # Should be valid YAML-like structure
-    assert "project_name:" in result
-    assert "sample_sources:" in result
+    # Parse as YAML to verify structure is valid
+    parsed = yaml.safe_load(result)
+
+    # Verify it's a valid dict with expected keys
+    assert isinstance(parsed, dict)
+    assert "project_name" in parsed
+    assert parsed["project_name"] == "test-project"
+
+    # Verify sample_sources structure
+    assert "sample_sources" in parsed
+    assert isinstance(parsed["sample_sources"], list)
+    assert len(parsed["sample_sources"]) > 0
+    assert "/tmp/samples" in parsed["sample_sources"][0]
+
+    # Verify library configuration contains project_root
+    assert "library" in parsed
+    assert "project_root" in parsed["library"]
+    assert parsed["library"]["project_root"] == "/tmp/test-project"
 
 
 def test_session_tidal_template_exists():
@@ -302,6 +317,8 @@ def test_mcp_json_template_exists():
 
 def test_mcp_json_template_renders():
     """.mcp.json template renders with project variables."""
+    import json
+
     template_dir = get_template_dir()
     template_file = template_dir / "project" / ".mcp.json.template"
 
@@ -311,11 +328,19 @@ def test_mcp_json_template_renders():
 
     result = render_template(template_file, variables)
 
-    # Should contain project root
-    assert "/home/user/project" in result
-    # Should be JSON-like structure
-    assert "{" in result
-    assert "mcpServers" in result or "servers" in result
+    # Parse as JSON to verify structure is valid
+    parsed = json.loads(result)
+
+    # Verify it's a valid dict
+    assert isinstance(parsed, dict)
+
+    # Verify mcpServers structure exists
+    assert "mcpServers" in parsed
+    assert isinstance(parsed["mcpServers"], dict)
+
+    # Verify project root is used in configuration
+    result_str = json.dumps(parsed)
+    assert "/home/user/project" in result_str
 
 
 def test_gitignore_template_exists():

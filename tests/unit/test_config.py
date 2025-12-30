@@ -24,11 +24,18 @@ class TestAudiomancerConfig:
         assert config.generation.default_bpm == 120.0
 
     def test_storage_paths_expanded(self):
-        """Paths should be expanded from ~."""
+        """Paths should be expanded from ~ and be absolute."""
         config = AudiomancerConfig()
-        assert "~" not in str(config.storage.db_path)
-        assert "~" not in str(config.storage.embeddings_path)
-        assert "~" not in str(config.storage.models_path)
+
+        # Verify paths are absolute (not just substring check)
+        assert config.storage.db_path.is_absolute()
+        assert config.storage.embeddings_path.is_absolute()
+        assert config.storage.models_path.is_absolute()
+
+        # Verify tilde is expanded (no ~ in path parts)
+        assert "~" not in config.storage.db_path.parts
+        assert "~" not in config.storage.embeddings_path.parts
+        assert "~" not in config.storage.models_path.parts
 
     def test_storage_paths_are_absolute(self):
         """All storage paths should be absolute."""
