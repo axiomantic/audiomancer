@@ -159,11 +159,11 @@ audiomancer doctor
 ### Claude Code Setup
 
 ```bash
-# Add globally (available in all projects)
-claude mcp add audiomancer --scope user -- audiomancer serve
+# Use the full path to the venv's audiomancer binary
+claude mcp add audiomancer --scope user -- /path/to/audiomancer/.venv/bin/audiomancer serve
 
-# Or add to current project only
-claude mcp add audiomancer -- audiomancer serve
+# Example with actual path:
+# claude mcp add audiomancer --scope user -- ~/Development/audiomancer/.venv/bin/audiomancer serve
 ```
 
 ### Claude Desktop Setup
