@@ -2,6 +2,7 @@
 
 import sys
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Optional
 
@@ -27,6 +28,85 @@ def get_config_dir() -> Path:
 def get_data_dir() -> Path:
     """Get the audiomancer data directory."""
     return get_config_dir() / "data"
+
+
+def scaffold_project(
+    project_path: Path,
+    project_name: str,
+    sample_source: Path,
+    create_git: bool = True,
+) -> None:
+    """Create a new TidalCycles project with scaffolding.
+
+    Args:
+        project_path: Path to create project directory
+        project_name: Name of the project
+        sample_source: Path to sample source directory
+        create_git: Whether to initialize git repo (default: True)
+    """
+    from audiomancer.templates import (
+        get_template_dir,
+        render_template,
+        get_template_variables,
+    )
+
+    # Create project directory if it doesn't exist
+    project_path.mkdir(parents=True, exist_ok=True)
+
+    # Create subdirectories
+    (project_path / "library").mkdir(exist_ok=True)
+    (project_path / "synths").mkdir(exist_ok=True)
+
+    # Create samples directory or symlink
+    samples_dir = project_path / "samples"
+    sample_source_abs = sample_source.resolve()
+    project_path_abs = project_path.resolve()
+
+    # Check if sample_source is inside project_path
+    try:
+        sample_source_abs.relative_to(project_path_abs)
+        is_inside_project = True
+    except ValueError:
+        is_inside_project = False
+
+    if is_inside_project:
+        # Create as regular directory
+        samples_dir.mkdir(exist_ok=True)
+    else:
+        # Create as symlink to external source
+        if samples_dir.exists() or samples_dir.is_symlink():
+            # Remove existing before creating symlink
+            if samples_dir.is_symlink():
+                samples_dir.unlink()
+            elif samples_dir.is_dir():
+                shutil.rmtree(samples_dir)
+            else:
+                samples_dir.unlink()
+        samples_dir.symlink_to(sample_source_abs)
+
+    # Render templates
+    template_dir = get_template_dir() / "project"
+    variables = get_template_variables(project_name, project_path, sample_source)
+
+    for template_file in template_dir.glob("*.template"):
+        # Get output filename (remove .template extension)
+        output_name = template_file.stem
+        output_path = project_path / output_name
+
+        # Render and write template
+        rendered_content = render_template(template_file, variables)
+        output_path.write_text(rendered_content, encoding='utf-8')
+
+    # Initialize git repo if requested and not already a repo
+    if create_git:
+        git_dir = project_path / ".git"
+        if not git_dir.exists():
+            subprocess.run(
+                ["git", "init"],
+                cwd=project_path,
+                check=True,
+                capture_output=True,
+            )
 
 
 @app.command()
