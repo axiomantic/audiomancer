@@ -317,6 +317,33 @@ class TestDeepMergeDicts:
         assert result == {"a": 1, "b": None, "c": 3}
 
 
+class TestAudiomancerConfigPrivateAttrs:
+    """Tests for AudiomancerConfig private attributes."""
+
+    def test_config_project_root_default_none(self):
+        """_project_root should default to None."""
+        config = AudiomancerConfig()
+        assert config._project_root is None
+
+    def test_config_project_root_set_via_private_attr(self):
+        """_project_root should be settable and retrievable."""
+        config = AudiomancerConfig()
+        test_path = Path("/test/project/root")
+        config._project_root = test_path
+        assert config._project_root == test_path
+
+    def test_config_project_root_not_serialized(self):
+        """_project_root should not appear in model_dump (private attr)."""
+        config = AudiomancerConfig()
+        config._project_root = Path("/test/project/root")
+
+        serialized = config.model_dump()
+
+        # Private attributes should NOT be in serialization
+        assert "_project_root" not in serialized
+        assert "project_root" not in serialized
+
+
 class TestFindProjectConfig:
     """Tests for find_project_config."""
 

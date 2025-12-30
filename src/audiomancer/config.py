@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 import os
 import yaml
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, PrivateAttr
 from pydantic_settings import BaseSettings
 
 
@@ -169,6 +169,8 @@ class AudiomancerConfig(BaseModel):
     generation: GenerationConfig = Field(default_factory=GenerationConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     library: LibraryConfig = Field(default_factory=LibraryConfig)
+
+    _project_root: Optional[Path] = PrivateAttr(default=None)
 
 
 def deep_merge_dicts(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
