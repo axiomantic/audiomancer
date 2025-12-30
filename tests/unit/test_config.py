@@ -9,6 +9,7 @@ from audiomancer.config import (
     get_config_dir,
     get_data_dir,
     get_config_path,
+    deep_merge_dicts,
 )
 
 
@@ -247,3 +248,69 @@ class TestConfigHelpers:
         monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
         assert get_config_path() == tmp_path / ".config" / "audiomancer" / "config.yaml"
+
+
+class TestDeepMergeDicts:
+    """Tests for deep_merge_dicts utility."""
+
+    def test_deep_merge_empty_dicts(self):
+        """Merging empty dicts should return empty dict."""
+        result = deep_merge_dicts({}, {})
+        assert result == {}
+
+    def test_deep_merge_flat_dicts(self):
+        """Flat dicts should merge with override taking precedence."""
+        base = {"a": 1, "b": 2}
+        override = {"b": 3, "c": 4}
+        result = deep_merge_dicts(base, override)
+        assert result == {"a": 1, "b": 3, "c": 4}
+
+    def test_deep_merge_nested_dicts(self):
+        """Nested dicts should merge recursively."""
+        base = {
+            "level1": {
+                "a": 1,
+                "b": 2,
+                "level2": {
+                    "x": 10,
+                    "y": 20
+                }
+            }
+        }
+        override = {
+            "level1": {
+                "b": 99,
+                "level2": {
+                    "y": 99,
+                    "z": 30
+                },
+                "c": 3
+            }
+        }
+        result = deep_merge_dicts(base, override)
+        assert result == {
+            "level1": {
+                "a": 1,
+                "b": 99,
+                "c": 3,
+                "level2": {
+                    "x": 10,
+                    "y": 99,
+                    "z": 30
+                }
+            }
+        }
+
+    def test_deep_merge_override_primitive(self):
+        """Override should replace primitive values completely."""
+        base = {"config": {"value": 100}}
+        override = {"config": {"value": 200}}
+        result = deep_merge_dicts(base, override)
+        assert result == {"config": {"value": 200}}
+
+    def test_deep_merge_none_values(self):
+        """None values in override should be preserved."""
+        base = {"a": 1, "b": 2}
+        override = {"b": None, "c": 3}
+        result = deep_merge_dicts(base, override)
+        assert result == {"a": 1, "b": None, "c": 3}
