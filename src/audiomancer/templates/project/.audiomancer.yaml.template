@@ -23,6 +23,8 @@ supercollider:
 
 # Library management
 library:
+  project_root: {{ project_root }}
+  source_dir: {{ sample_source }}
   enabled_packs: []  # Managed by library_manager.py
   max_file_size_mb: 10
   cache_directory: "samples"
