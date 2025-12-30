@@ -110,60 +110,50 @@ def scaffold_project(
 
 
 @app.command()
-def init():
-    """Initialize audiomancer (create config, download models)."""
-    config_dir = get_config_dir()
-    data_dir = get_data_dir()
+def init(
+    path: Optional[Path] = typer.Option(None, "--path", help="Project directory (default: current directory)"),
+):
+    """Initialize a new TidalCycles project with interactive prompts."""
+    # Determine project path
+    project_path = path if path else Path.cwd()
 
-    # Create directories
-    config_dir.mkdir(parents=True, exist_ok=True)
-    data_dir.mkdir(parents=True, exist_ok=True)
-    (data_dir / "samples").mkdir(exist_ok=True)
-    (data_dir / "synths").mkdir(exist_ok=True)
+    # Check if project already has .audiomancer.yaml
+    config_file = project_path / ".audiomancer.yaml"
+    if config_file.exists():
+        console.print(f"[yellow]Project already initialized at {project_path}[/yellow]")
+        console.print(f"Config file: {config_file}")
+        return
 
-    # Create default config
-    config_path = config_dir / "config.yaml"
-    if not config_path.exists():
-        default_config = """# audiomancer configuration
-# Audio analysis settings
-analysis:
-  sample_rate: 44100
-  hop_size: 512
-  frame_size: 2048
+    # Prompt for project name with default from directory name
+    default_name = project_path.name
+    project_name = typer.prompt("Project name", default=default_name)
 
-# Search settings
-search:
-  max_results: 20
-  similarity_threshold: 0.7
+    # Prompt for sample source path with validation
+    while True:
+        sample_source_str = typer.prompt("Sample source directory")
+        sample_source = Path(sample_source_str).expanduser().resolve()
 
-# Directories to scan
-scan_paths:
-  samples: []
-  synths: []
+        if sample_source.exists() and sample_source.is_dir():
+            break
+        else:
+            console.print(f"[red]Path does not exist or is not a directory: {sample_source}[/red]")
+            console.print("Please enter a valid directory path.")
 
-# Model settings
-models:
-  embeddings: "musicnn"  # musicnn, vggish, or openl3
-  bpm_detection: "essentia"
-"""
-        config_path.write_text(default_config)
-        console.print(f"[green]✓[/green] Created config: {config_path}")
-    else:
-        console.print(f"[yellow]![/yellow] Config already exists: {config_path}")
+    # Call scaffold_project with gathered values
+    scaffold_project(
+        project_path=project_path,
+        project_name=project_name,
+        sample_source=sample_source,
+        create_git=True,
+    )
 
-    # Success message
-    welcome = f"""[bold green]audiomancer initialized successfully![/bold green]
-
-[bold]Next steps:[/bold]
-  1. Run [cyan]audiomancer doctor[/cyan] to check your environment
-  2. Add sample/synth paths to [cyan]{config_path}[/cyan]
-  3. Run [cyan]audiomancer scan[/cyan] to index your library
-  4. Start the MCP server with [cyan]audiomancer serve[/cyan]
-
-[dim]Config directory: {config_dir}
-Data directory: {data_dir}[/dim]
-"""
-    console.print(Panel(welcome, border_style="green"))
+    # Success message with next steps
+    console.print(f"\n[bold green]Project '{project_name}' initialized successfully![/bold green]\n")
+    console.print("[bold]Next steps:[/bold]")
+    console.print("  1. Start SuperCollider: [cyan]open -a SuperCollider start_superdirt.scd[/cyan]")
+    console.print("  2. Open session.tidal in VS Code with TidalCycles extension")
+    console.print("  3. Start coding live music!")
+    console.print(f"\n[dim]Project directory: {project_path}[/dim]")
 
 
 @app.command()
