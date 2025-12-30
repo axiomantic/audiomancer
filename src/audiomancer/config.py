@@ -1,7 +1,7 @@
 """Configuration system for audiomancer."""
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 import os
 import yaml
 from pydantic import BaseModel, Field, field_validator
@@ -169,6 +169,33 @@ class AudiomancerConfig(BaseModel):
     generation: GenerationConfig = Field(default_factory=GenerationConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     library: LibraryConfig = Field(default_factory=LibraryConfig)
+
+
+def deep_merge_dicts(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Recursively merge two dictionaries.
+
+    Args:
+        base: Base dictionary
+        override: Override dictionary (takes precedence)
+
+    Returns:
+        Merged dictionary where override values take precedence.
+        Nested dicts are merged recursively.
+
+    Example:
+        >>> base = {"a": 1, "b": {"x": 10}}
+        >>> override = {"b": {"y": 20}, "c": 3}
+        >>> deep_merge_dicts(base, override)
+        {"a": 1, "b": {"x": 10, "y": 20}, "c": 3}
+    """
+    result = base.copy()
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = deep_merge_dicts(result[key], value)
+        else:
+            result[key] = value
+    return result
 
 
 def get_config_dir() -> Path:
