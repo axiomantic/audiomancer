@@ -46,11 +46,14 @@ Full guide: https://tidalcycles.org/docs/getting-started/macos_install/
 
 **Option B: Pulsar** - Already installed by tidal-bootstrap
 
-### Direnv (Auto-activate Environment)
+### uv + Direnv (Python Environment)
 
-This project uses direnv to automatically activate the Python virtual environment when you enter the directory.
+This project uses **uv** (fast Python package manager) and **direnv** (auto-activate environments).
 
 ```bash
+# Install uv (fast Python package manager)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
 # Install direnv
 brew install direnv
 
