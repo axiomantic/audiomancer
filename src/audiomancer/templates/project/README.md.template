@@ -16,46 +16,37 @@ A TidalCycles live coding project powered by [audiomancer](https://github.com/yo
 
 ## Prerequisites
 
-Before you can make music, you need the TidalCycles stack installed:
+### Easy Install (Recommended)
 
-### 1. SuperCollider (Audio Engine)
-
-Download and install from: https://supercollider.github.io/downloads
-
-After installing, open SuperCollider and run this to install SuperDirt:
-```supercollider
-Quarks.checkForUpdates({Quarks.install("SuperDirt", "v1.7.3"); thisProcess.recompile})
-```
-
-### 2. Haskell (GHC via ghcup)
-
-Install ghcup (manages Haskell installations):
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
-```
-
-Then install GHC and cabal:
-```bash
-ghcup install ghc 9.6.7
-ghcup set ghc 9.6.7
-ghcup install cabal latest
-```
-
-### 3. TidalCycles
+The **tidal-bootstrap** script installs everything automatically:
 
 ```bash
-cabal update
-cabal install tidal --lib
+# 1. Install Xcode command line tools (if not already installed)
+xcode-select --install
+
+# 2. Run tidal-bootstrap (installs SuperCollider, Haskell, TidalCycles, SuperDirt, etc.)
+curl https://raw.githubusercontent.com/tidalcycles/tidal-bootstrap/master/tidal-bootstrap.command -sSf | sh
 ```
 
-Full guide: https://tidalcycles.org/docs/getting-started/installation/
+This takes 20-30 minutes but is completely hands-off. It installs:
+- SuperCollider + SuperDirt + SC3 Plugins
+- Haskell (ghcup + GHC + cabal)
+- TidalCycles
+- Pulsar editor with Tidal plugin
 
-### 4. VS Code + TidalCycles Extension (Recommended)
+After it completes, **start a new terminal** to load the updated PATH.
 
+Full guide: https://tidalcycles.org/docs/getting-started/macos_install/
+
+### Editor Setup
+
+**Option A: VS Code (Recommended)**
 1. Install [VS Code](https://code.visualstudio.com/)
 2. Install the [TidalCycles extension](https://marketplace.visualstudio.com/items?itemName=tidalcycles.vscode-tidalcycles)
 
-### 5. Audiomancer (AI Integration)
+**Option B: Pulsar** - Already installed by tidal-bootstrap
+
+### Audiomancer (AI Integration)
 
 ```bash
 pip install audiomancer
