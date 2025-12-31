@@ -1,0 +1,369 @@
+# {{ project_name }}
+
+A TidalCycles live coding project powered by [audiomancer](https://github.com/youruser/audiomancer).
+
+## Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Project Structure](#project-structure)
+- [Daily Workflow](#daily-workflow)
+- [TidalCycles Basics](#tidalcycles-basics)
+- [Sample Management](#sample-management)
+- [Custom Synths](#custom-synths)
+- [AI Collaboration](#ai-collaboration)
+- [Troubleshooting](#troubleshooting)
+
+## Prerequisites
+
+Before you can make music, you need the TidalCycles stack installed:
+
+### 1. SuperCollider (Audio Engine)
+
+Download and install from: https://supercollider.github.io/downloads
+
+After installing, open SuperCollider and run this to install SuperDirt:
+```supercollider
+Quarks.checkForUpdates({Quarks.install("SuperDirt", "v1.7.3"); thisProcess.recompile})
+```
+
+### 2. Haskell (GHC via ghcup)
+
+Install ghcup (manages Haskell installations):
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
+```
+
+Then install GHC and cabal:
+```bash
+ghcup install ghc 9.6.7
+ghcup set ghc 9.6.7
+ghcup install cabal latest
+```
+
+### 3. TidalCycles
+
+```bash
+cabal update
+cabal install tidal --lib
+```
+
+Full guide: https://tidalcycles.org/docs/getting-started/installation/
+
+### 4. VS Code + TidalCycles Extension (Recommended)
+
+1. Install [VS Code](https://code.visualstudio.com/)
+2. Install the [TidalCycles extension](https://marketplace.visualstudio.com/items?itemName=tidalcycles.vscode-tidalcycles)
+
+### 5. Audiomancer (AI Integration)
+
+```bash
+pip install audiomancer
+# Or from source:
+git clone https://github.com/youruser/audiomancer
+cd audiomancer && pip install -e ".[dev]"
+```
+
+### Verify Installation
+
+```bash
+audiomancer doctor
+```
+
+This checks that all dependencies are properly installed.
+
+## Quick Start
+
+### First Time Setup
+
+1. **Start SuperCollider audio engine:**
+   ```bash
+   open -a SuperCollider start_superdirt.scd
+   ```
+   Wait for "SuperDirt: listening to Tidal on port 57120" in the SuperCollider post window.
+
+2. **Open your session in VS Code:**
+   ```bash
+   code session.tidal
+   ```
+
+3. **Start making sound:**
+   - Place cursor on a line of code
+   - Press `Shift+Enter` to evaluate that line
+   - Press `Ctrl+Enter` to evaluate a block
+
+### Your First Pattern
+
+```haskell
+-- Evaluate this line (Shift+Enter):
+d1 $ sound "bd bd sn bd"
+
+-- Stop it:
+d1 $ silence
+
+-- Stop everything:
+hush
+```
+
+## Project Structure
+
+```
+{{ project_name }}/
+├── .audiomancer.yaml   # Project configuration
+├── .mcp.json           # Claude Code MCP server config
+├── CLAUDE.md           # AI assistant instructions
+├── README.md           # This file
+├── session.tidal       # Your live coding workspace
+├── start_superdirt.scd # SuperCollider startup script
+├── library/            # Enabled samples (symlinks)
+├── samples/            # Local sample cache
+└── synths/             # Custom SuperCollider synths
+```
+
+## Daily Workflow
+
+### Starting a Session
+
+1. **Terminal 1 - Start SuperDirt:**
+   ```bash
+   open -a SuperCollider start_superdirt.scd
+   ```
+
+2. **Terminal 2 - Start Claude Code (optional, for AI help):**
+   ```bash
+   claude
+   ```
+
+3. **VS Code - Open session.tidal and start coding!**
+
+### Ending a Session
+
+1. Save your work in `session.tidal`
+2. `hush` to stop all sounds
+3. Quit SuperCollider
+4. Commit your changes: `git add -A && git commit -m "session notes"`
+
+## TidalCycles Basics
+
+### Channels
+
+TidalCycles has 16 channels: `d1` through `d16` (and `d0` for special use).
+
+```haskell
+d1 $ sound "bd"      -- kick on channel 1
+d2 $ sound "hh*4"    -- hihat on channel 2
+d3 $ sound "cp"      -- clap on channel 3
+
+d1 $ silence         -- stop channel 1
+hush                 -- stop everything
+```
+
+### Pattern Syntax
+
+```haskell
+-- Basic pattern
+d1 $ sound "bd sn bd sn"
+
+-- Rests with ~
+d1 $ sound "bd ~ sn ~"
+
+-- Multiply (play faster)
+d1 $ sound "hh*8"          -- 8 hihats per cycle
+
+-- Divide (play slower)
+d1 $ sound "bd/2"          -- 1 kick every 2 cycles
+
+-- Sample variations
+d1 $ sound "bd:0 bd:1 bd:2 bd:3"
+
+-- Grouping
+d1 $ sound "[bd sn] [hh hh hh]"
+
+-- Polyrhythm
+d1 $ sound "[bd bd bd, hh hh hh hh hh]"
+
+-- Euclidean rhythms
+d1 $ sound "bd(3,8)"       -- 3 hits spread over 8 steps
+```
+
+### Effects
+
+```haskell
+d1 $ sound "bd sn"
+   # gain 0.8              -- volume (0-1)
+   # pan 0.3               -- stereo position (0=left, 1=right)
+   # speed 1.5             -- playback speed/pitch
+   # room 0.5              -- reverb amount
+   # delay 0.3             -- delay amount
+   # lpf 1000              -- low-pass filter (Hz)
+   # hpf 200               -- high-pass filter (Hz)
+```
+
+### Pattern Transformations
+
+```haskell
+d1 $ rev $ sound "bd sn cp hh"           -- reverse
+d1 $ fast 2 $ sound "bd sn"              -- double speed
+d1 $ slow 2 $ sound "bd sn"              -- half speed
+d1 $ every 4 (fast 2) $ sound "bd sn"    -- every 4th cycle, double speed
+d1 $ jux rev $ sound "bd sn"             -- reverse in right channel
+d1 $ chunk 4 (fast 2) $ sound "bd sn"    -- speed up different quarter each cycle
+```
+
+## Sample Management
+
+### Using the Library Manager
+
+Your samples are managed through audiomancer:
+
+```bash
+# Interactive browser
+python3 library_manager.py
+
+# List all available packs
+python3 library_manager.py list
+
+# Enable a sample pack
+python3 library_manager.py enable "808 Drum Kit"
+
+# Search for packs
+python3 library_manager.py search techno
+```
+
+After enabling new packs, restart SuperDirt to load them.
+
+### Sample Naming
+
+Samples use this naming convention: `{pack}_{category}[_{bpm}]`
+
+Examples:
+- `808dk_bd` - 808 Drum Kit kick
+- `vihodr_sn` - Vinyl House snare
+- `techno_hh_130` - Techno hihat at 130 BPM
+
+### Built-in Samples (Dirt-Samples)
+
+TidalCycles comes with ~200 sample folders. Common ones:
+
+| Sample | Description |
+|--------|-------------|
+| `bd` | Kicks (24 variations) |
+| `sn` | Snares (52 variations) |
+| `hh` | Hihats |
+| `cp` | Claps |
+| `808` | 808 drum machine |
+| `arpy` | Synth notes |
+| `bass` | Bass sounds |
+| `jvbass` | Synth bass notes |
+
+Use variations with `:n` syntax: `sound "bd:3"` plays the 4th kick.
+
+## Custom Synths
+
+This project includes custom SuperCollider synths in the `synths/` folder.
+
+### TB-303 Acid Bass
+
+```haskell
+d1 $ n "0 3 7 12" # s "tb303"
+   # cutoff 1200
+   # resonance 0.7
+   # envmod 0.6
+```
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| `cutoff` | 200-4000 | Filter frequency |
+| `resonance` | 0-1 | Filter resonance (0.7+ for squelch) |
+| `envmod` | 0-1 | Envelope to filter amount |
+| `decay` | 0.05-0.5 | Filter envelope decay |
+| `accent` | 0-1 | Per-step accent |
+| `slide` | 0-1 | Portamento/glide |
+
+## AI Collaboration
+
+This project is set up for AI-assisted music creation with Claude Code.
+
+### Starting Claude Code
+
+```bash
+claude
+```
+
+The MCP server automatically detects this project and loads your sample library.
+
+### Things You Can Ask
+
+- "What sample packs do I have?"
+- "Enable the 808 kit"
+- "Generate a techno drum pattern at 130 BPM"
+- "Find samples similar to this kick"
+- "Add some variation to the hihat pattern"
+- "Make the bass more funky"
+
+### How It Works
+
+1. You write TidalCycles code in `session.tidal`
+2. Claude can read and edit the same file
+3. You evaluate the code when you're ready (Shift+Enter)
+4. The AI uses your actual sample library, not generic names
+
+See `CLAUDE.md` for full AI instructions and sample reference.
+
+## Troubleshooting
+
+### No Sound
+
+1. **Check SuperDirt is running:**
+   Look for "SuperDirt: listening to Tidal on port 57120" in SuperCollider
+
+2. **Check audio output:**
+   In SuperCollider: `Server.default.options.outDevice`
+
+3. **Restart everything:**
+   ```bash
+   # Quit SuperCollider, then:
+   open -a SuperCollider start_superdirt.scd
+   ```
+
+### "Cannot find sample"
+
+1. Make sure the sample pack is enabled:
+   ```bash
+   python3 library_manager.py list
+   ```
+
+2. Restart SuperDirt after enabling packs
+
+### TidalCycles Won't Start in VS Code
+
+1. Check Haskell is in PATH:
+   ```bash
+   source ~/.ghcup/env
+   ghci
+   ```
+
+2. Reinstall TidalCycles:
+   ```bash
+   cabal update && cabal install tidal --lib
+   ```
+
+### Run Diagnostics
+
+```bash
+audiomancer doctor
+```
+
+This checks all dependencies and shows what's missing.
+
+## Resources
+
+- [TidalCycles Documentation](https://tidalcycles.org/docs/)
+- [TidalCycles Pattern Reference](https://tidalcycles.org/docs/reference/cycles)
+- [SuperCollider Documentation](https://doc.sccode.org/)
+- [Audiomancer GitHub](https://github.com/youruser/audiomancer)
+- [TidalCycles Discord](https://discord.gg/ugFq7KP)
+
+---
+
+Happy live coding!
