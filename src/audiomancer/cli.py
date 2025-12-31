@@ -250,15 +250,94 @@ def doctor():
         )
         all_passed = False
 
-    # Check sclang binary
+    # Check SuperCollider (sclang)
     sclang_path = shutil.which("sclang")
     if sclang_path:
-        table.add_row("sclang", "[green]✓[/green]", sclang_path)
+        table.add_row("SuperCollider (sclang)", "[green]✓[/green]", sclang_path)
     else:
         table.add_row(
-            "sclang",
+            "SuperCollider (sclang)",
+            "[red]✗[/red]",
+            "Install from https://supercollider.github.io/downloads",
+        )
+        all_passed = False
+
+    # Check TidalCycles (ghci with Sound.Tidal.Context)
+    ghci_path = shutil.which("ghci")
+    if ghci_path:
+        # Try to import Sound.Tidal.Context
+        try:
+            result = subprocess.run(
+                [ghci_path, "-e", "import Sound.Tidal.Context"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                table.add_row("TidalCycles (ghci)", "[green]✓[/green]", ghci_path)
+            else:
+                table.add_row(
+                    "TidalCycles (ghci)",
+                    "[red]✗[/red]",
+                    "ghci found but TidalCycles not installed. See https://tidalcycles.org/docs/getting-started/installation/",
+                )
+                all_passed = False
+        except subprocess.TimeoutExpired:
+            table.add_row(
+                "TidalCycles (ghci)",
+                "[yellow]![/yellow]",
+                "ghci check timed out",
+            )
+        except Exception as e:
+            table.add_row(
+                "TidalCycles (ghci)",
+                "[yellow]![/yellow]",
+                f"Error checking TidalCycles: {e}",
+            )
+    else:
+        table.add_row(
+            "TidalCycles (ghci)",
+            "[red]✗[/red]",
+            "ghci not found. Install ghcup from https://www.haskell.org/ghcup/",
+        )
+        all_passed = False
+
+    # Check GHC
+    ghc_path = shutil.which("ghc")
+    if ghc_path:
+        try:
+            result = subprocess.run(
+                [ghc_path, "--version"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                version = result.stdout.strip().split()[-1] if result.stdout else "unknown"
+                table.add_row("GHC (Haskell compiler)", "[green]✓[/green]", f"{ghc_path} ({version})")
+            else:
+                table.add_row(
+                    "GHC (Haskell compiler)",
+                    "[yellow]![/yellow]",
+                    "ghc found but version check failed",
+                )
+        except subprocess.TimeoutExpired:
+            table.add_row(
+                "GHC (Haskell compiler)",
+                "[yellow]![/yellow]",
+                "ghc version check timed out",
+            )
+        except Exception as e:
+            table.add_row(
+                "GHC (Haskell compiler)",
+                "[yellow]![/yellow]",
+                f"Error checking GHC: {e}",
+            )
+    else:
+        table.add_row(
+            "GHC (Haskell compiler)",
             "[yellow]![/yellow]",
-            "Not found (install SuperCollider for synth analysis)",
+            "Not found (install ghcup from https://www.haskell.org/ghcup/)",
         )
 
     # Check config

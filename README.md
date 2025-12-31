@@ -136,6 +136,21 @@ AI: [calls search_samples]
     ...
 ```
 
+## Prerequisites
+
+Before installing audiomancer, you need a working TidalCycles setup:
+
+- **TidalCycles**: Live coding language and runtime
+  - Installation guide: https://tidalcycles.org/docs/getting-started/installation/
+- **SuperCollider**: Audio synthesis platform (required for TidalCycles)
+  - Download: https://supercollider.github.io/downloads
+- **VS Code TidalCycles Extension**: Editor integration
+  - Extension: https://marketplace.visualstudio.com/items?itemName=tidalcycles.vscode-tidalcycles
+- **ghcup**: Haskell toolchain manager (for TidalCycles)
+  - Installation: https://www.haskell.org/ghcup/
+
+Run `audiomancer doctor` after installation to verify all prerequisites are installed.
+
 ## Installation
 
 ```bash
@@ -144,7 +159,7 @@ git clone https://github.com/youruser/audiomancer
 cd audiomancer
 pip install -e ".[dev]"
 
-# Check dependencies
+# Check dependencies (including TidalCycles setup)
 audiomancer doctor
 ```
 

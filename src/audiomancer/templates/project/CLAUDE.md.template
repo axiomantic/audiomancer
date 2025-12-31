@@ -6,6 +6,21 @@ This is a TidalCycles live coding environment for algorithmic music. The user wo
 
 **Key principle**: User edits in their editor, Claude edits the same `.tidal` files. User evaluates when ready.
 
+## Prerequisites
+
+This project requires a working TidalCycles setup:
+
+- **TidalCycles**: Live coding language and runtime
+  - Installation: https://tidalcycles.org/docs/getting-started/installation/
+- **SuperCollider**: Audio synthesis platform (required for TidalCycles)
+  - Download: https://supercollider.github.io/downloads
+- **VS Code TidalCycles Extension**: Editor integration
+  - Extension: https://marketplace.visualstudio.com/items?itemName=tidalcycles.vscode-tidalcycles
+- **ghcup**: Haskell toolchain manager (for TidalCycles)
+  - Installation: https://www.haskell.org/ghcup/
+
+Verify installation with: `audiomancer doctor`
+
 ## Startup Workflow
 
 1. Start SuperDirt: `open -a SuperCollider start_superdirt.scd`
