@@ -1,0 +1,4 @@
+# Activate project virtual environment
+# Install direnv: brew install direnv
+# Then add to your shell: eval "$(direnv hook zsh)"  # or bash/fish
+source .venv/bin/activate

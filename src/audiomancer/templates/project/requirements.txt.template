@@ -1,0 +1,13 @@
+# Python dependencies for {{ project_name }}
+#
+# Install with: pip install -r requirements.txt
+# Or with uv:   uv pip install -r requirements.txt
+
+# AI-assisted music production (install from source if not on PyPI)
+# pip install -e /path/to/audiomancer
+# audiomancer
+
+# Sample library management
+aiofiles
+tqdm
+rich

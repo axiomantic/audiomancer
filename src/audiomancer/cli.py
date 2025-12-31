@@ -108,6 +108,26 @@ def scaffold_project(
                 capture_output=True,
             )
 
+    # Create virtual environment
+    venv_dir = project_path / ".venv"
+    if not venv_dir.exists():
+        # Try uv first (faster), fall back to python venv
+        if shutil.which("uv"):
+            subprocess.run(
+                ["uv", "venv"],
+                cwd=project_path,
+                check=True,
+                capture_output=True,
+            )
+        else:
+            # Fallback to standard venv
+            subprocess.run(
+                [sys.executable, "-m", "venv", ".venv"],
+                cwd=project_path,
+                check=True,
+                capture_output=True,
+            )
+
 
 @app.command()
 def init(

@@ -46,14 +46,23 @@ Full guide: https://tidalcycles.org/docs/getting-started/macos_install/
 
 **Option B: Pulsar** - Already installed by tidal-bootstrap
 
-### Audiomancer (AI Integration)
+### Direnv (Auto-activate Environment)
+
+This project uses direnv to automatically activate the Python virtual environment when you enter the directory.
 
 ```bash
-pip install audiomancer
-# Or from source:
-git clone https://github.com/youruser/audiomancer
-cd audiomancer && pip install -e ".[dev]"
+# Install direnv
+brew install direnv
+
+# Add to your shell (~/.zshrc or ~/.bashrc)
+eval "$(direnv hook zsh)"  # or bash/fish
+
+# Restart your shell, then allow this project
+cd {{ project_name }}
+direnv allow
 ```
+
+Now the venv activates automatically when you `cd` into the project!
 
 ### Verify Installation
 
