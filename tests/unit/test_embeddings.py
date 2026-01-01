@@ -7,6 +7,8 @@ from audiomancer.analyzers.embeddings import (
     extract_audio_embedding,
     cosine_similarity,
     euclidean_distance,
+    SimilarityIndex,
+    FAISS_AVAILABLE,
 )
 from audiomancer.errors import ModelLoadError, AnalysisFailedError
 from tests.utils import create_test_audio
@@ -350,3 +352,398 @@ class TestEmbeddingConsistency:
         # Should be identical (or very close due to normalization)
         for v1, v2 in zip(embedding1, embedding2):
             assert math.isclose(v1, v2, abs_tol=1e-6)
+
+
+@pytest.mark.skipif(not FAISS_AVAILABLE, reason="faiss-cpu not installed")
+class TestSimilarityIndex:
+    """Test SimilarityIndex for fast nearest-neighbor search."""
+
+    def test_init_default_dimension(self):
+        """Test initialization with default dimension."""
+        index = SimilarityIndex()
+
+        assert index.dimension == 128
+        assert index.ntotal == 0
+
+    def test_init_custom_dimension(self):
+        """Test initialization with custom dimension."""
+        index = SimilarityIndex(dimension=256)
+
+        assert index.dimension == 256
+        assert index.ntotal == 0
+
+    @patch("audiomancer.analyzers.embeddings.FAISS_AVAILABLE", False)
+    def test_init_faiss_unavailable(self):
+        """Test that ImportError is raised when FAISS is unavailable."""
+        with pytest.raises(ImportError) as exc_info:
+            SimilarityIndex()
+
+        assert "faiss-cpu is required" in str(exc_info.value)
+        assert "pip install faiss-cpu" in str(exc_info.value)
+
+    def test_dimension_property(self):
+        """Test dimension property returns correct value."""
+        index = SimilarityIndex(dimension=64)
+
+        assert index.dimension == 64
+
+    def test_ntotal_property_empty(self):
+        """Test ntotal property returns 0 for empty index."""
+        index = SimilarityIndex()
+
+        assert index.ntotal == 0
+
+    def test_ntotal_property_after_add(self):
+        """Test ntotal property reflects number of added embeddings."""
+        index = SimilarityIndex()
+
+        # Add 3 embeddings
+        embeddings = [
+            [1/math.sqrt(128)] * 128,
+            [1/math.sqrt(128)] * 128,
+            [1/math.sqrt(128)] * 128,
+        ]
+        index.add(embeddings)
+
+        assert index.ntotal == 3
+
+    def test_add_single_embedding(self):
+        """Test adding a single embedding."""
+        index = SimilarityIndex()
+
+        # Create L2-normalized embedding
+        embedding = [1/math.sqrt(128)] * 128
+        index.add([embedding])
+
+        assert index.ntotal == 1
+
+    def test_add_multiple_embeddings(self):
+        """Test adding multiple embeddings at once."""
+        index = SimilarityIndex()
+
+        # Create 5 L2-normalized embeddings
+        embeddings = []
+        for i in range(5):
+            emb = np.random.randn(128).astype(np.float32)
+            emb = emb / np.linalg.norm(emb)  # L2 normalize
+            embeddings.append(emb.tolist())
+
+        index.add(embeddings)
+
+        assert index.ntotal == 5
+
+    def test_add_empty_list(self):
+        """Test that adding empty list is a no-op."""
+        index = SimilarityIndex()
+
+        index.add([])
+
+        assert index.ntotal == 0
+
+    def test_add_wrong_dimension(self):
+        """Test that adding wrong-dimension embeddings raises ValueError."""
+        index = SimilarityIndex(dimension=128)
+
+        # Try to add 64-dim embeddings
+        wrong_embeddings = [[0.1] * 64]
+
+        with pytest.raises(ValueError) as exc_info:
+            index.add(wrong_embeddings)
+
+        assert "128-dimensional" in str(exc_info.value)
+        assert "64" in str(exc_info.value)
+
+    def test_search_exact_match(self):
+        """Test search finds exact match with similarity ~1.0."""
+        index = SimilarityIndex()
+
+        # Create 3 different L2-normalized embeddings
+        emb1 = np.array([1.0] + [0.0] * 127, dtype=np.float32)
+        emb2 = np.array([0.0] + [1.0] + [0.0] * 126, dtype=np.float32)
+        emb3 = np.array([0.0, 0.0] + [1.0] + [0.0] * 125, dtype=np.float32)
+
+        index.add([emb1.tolist(), emb2.tolist(), emb3.tolist()])
+
+        # Search for exact match to emb2
+        similarities, indices = index.search(emb2.tolist(), k=1)
+
+        assert len(similarities) == 1
+        assert len(indices) == 1
+        assert indices[0] == 1  # emb2 was added second (index 1)
+        assert math.isclose(similarities[0], 1.0, abs_tol=1e-6)
+
+    def test_search_k_neighbors(self):
+        """Test search returns k nearest neighbors."""
+        index = SimilarityIndex()
+
+        # Add 5 embeddings
+        embeddings = []
+        for i in range(5):
+            emb = np.random.randn(128).astype(np.float32)
+            emb = emb / np.linalg.norm(emb)
+            embeddings.append(emb.tolist())
+
+        index.add(embeddings)
+
+        # Search for 3 nearest neighbors
+        query = embeddings[0]  # Use first embedding as query
+        similarities, indices = index.search(query, k=3)
+
+        assert len(similarities) == 3
+        assert len(indices) == 3
+        # First result should be exact match with index 0
+        assert indices[0] == 0
+        assert math.isclose(similarities[0], 1.0, abs_tol=1e-6)
+
+    def test_search_empty_index(self):
+        """Test that searching empty index raises ValueError."""
+        index = SimilarityIndex()
+
+        query = [1/math.sqrt(128)] * 128
+
+        with pytest.raises(ValueError) as exc_info:
+            index.search(query, k=5)
+
+        assert "empty" in str(exc_info.value).lower()
+
+    def test_search_wrong_query_dimension(self):
+        """Test that wrong-dimension query raises ValueError."""
+        index = SimilarityIndex(dimension=128)
+
+        # Add one embedding
+        embedding = [1/math.sqrt(128)] * 128
+        index.add([embedding])
+
+        # Try to search with wrong dimension
+        wrong_query = [0.1] * 64
+
+        with pytest.raises(ValueError) as exc_info:
+            index.search(wrong_query, k=1)
+
+        assert "128-dimensional" in str(exc_info.value)
+        assert "64" in str(exc_info.value)
+
+    def test_search_k_larger_than_ntotal(self):
+        """Test that k larger than ntotal returns all embeddings."""
+        index = SimilarityIndex()
+
+        # Add 3 embeddings
+        embeddings = []
+        for i in range(3):
+            emb = np.random.randn(128).astype(np.float32)
+            emb = emb / np.linalg.norm(emb)
+            embeddings.append(emb.tolist())
+
+        index.add(embeddings)
+
+        # Search with k=10 (larger than ntotal=3)
+        query = embeddings[0]
+        similarities, indices = index.search(query, k=10)
+
+        # Should return all 3 embeddings
+        assert len(similarities) == 3
+        assert len(indices) == 3
+
+    def test_save_and_load_roundtrip(self, tmp_path):
+        """Test save and load preserves index state."""
+        # Create index and add embeddings
+        index = SimilarityIndex(dimension=128)
+
+        embeddings = []
+        for i in range(5):
+            emb = np.random.randn(128).astype(np.float32)
+            emb = emb / np.linalg.norm(emb)
+            embeddings.append(emb.tolist())
+
+        index.add(embeddings)
+
+        # Save to file
+        index_path = tmp_path / "test.index"
+        index.save(index_path)
+
+        # Load from file
+        loaded_index = SimilarityIndex.load(index_path)
+
+        # Verify loaded index has same properties
+        assert loaded_index.dimension == 128
+        assert loaded_index.ntotal == 5
+
+        # Verify search results are identical
+        query = embeddings[0]
+
+        original_similarities, original_indices = index.search(query, k=3)
+        loaded_similarities, loaded_indices = loaded_index.search(query, k=3)
+
+        assert original_indices == loaded_indices
+        for orig_sim, loaded_sim in zip(original_similarities, loaded_similarities):
+            assert math.isclose(orig_sim, loaded_sim, abs_tol=1e-6)
+
+    def test_load_preserves_dimension_and_ntotal(self, tmp_path):
+        """Test that load preserves dimension and ntotal metadata."""
+        # Create index with custom dimension
+        index = SimilarityIndex(dimension=256)
+
+        # Add some embeddings
+        embeddings = []
+        for i in range(10):
+            emb = np.random.randn(256).astype(np.float32)
+            emb = emb / np.linalg.norm(emb)
+            embeddings.append(emb.tolist())
+
+        index.add(embeddings)
+
+        # Save
+        index_path = tmp_path / "custom.index"
+        index.save(index_path)
+
+        # Load
+        loaded = SimilarityIndex.load(index_path)
+
+        # Verify metadata
+        assert loaded.dimension == 256
+        assert loaded.ntotal == 10
+
+    def test_load_nonexistent_file(self, tmp_path):
+        """Test that loading non-existent file raises FileNotFoundError."""
+        nonexistent_path = tmp_path / "does_not_exist.index"
+
+        with pytest.raises(FileNotFoundError) as exc_info:
+            SimilarityIndex.load(nonexistent_path)
+
+        assert "not found" in str(exc_info.value).lower()
+
+    @patch("audiomancer.analyzers.embeddings.FAISS_AVAILABLE", False)
+    def test_load_faiss_unavailable(self, tmp_path):
+        """Test that load raises ImportError when FAISS unavailable."""
+        # Note: We can't actually create a real index file without FAISS,
+        # but we can test that the check happens before trying to load
+        fake_path = tmp_path / "fake.index"
+        fake_path.write_bytes(b"fake index data")
+
+        with pytest.raises(ImportError) as exc_info:
+            SimilarityIndex.load(fake_path)
+
+        assert "faiss-cpu is required" in str(exc_info.value)
+
+    def test_integration_build_and_search_ordering(self):
+        """Test building index and verifying cosine similarity ordering."""
+        index = SimilarityIndex()
+
+        # Create 5 embeddings with known relationships
+        # emb0 and emb1 will be very similar (differ by small noise)
+        # emb2, emb3, emb4 will be progressively different
+
+        base_emb = np.random.randn(128).astype(np.float32)
+        base_emb = base_emb / np.linalg.norm(base_emb)
+
+        emb0 = base_emb
+
+        # emb1: add small noise to base (high similarity)
+        emb1 = base_emb + np.random.randn(128).astype(np.float32) * 0.01
+        emb1 = emb1 / np.linalg.norm(emb1)
+
+        # emb2: add medium noise (medium similarity)
+        emb2 = base_emb + np.random.randn(128).astype(np.float32) * 0.5
+        emb2 = emb2 / np.linalg.norm(emb2)
+
+        # emb3: add large noise (low similarity)
+        emb3 = base_emb + np.random.randn(128).astype(np.float32) * 2.0
+        emb3 = emb3 / np.linalg.norm(emb3)
+
+        # emb4: completely random (very low similarity)
+        emb4 = np.random.randn(128).astype(np.float32)
+        emb4 = emb4 / np.linalg.norm(emb4)
+
+        embeddings = [emb0.tolist(), emb1.tolist(), emb2.tolist(),
+                      emb3.tolist(), emb4.tolist()]
+
+        index.add(embeddings)
+
+        # Search with emb0 as query
+        similarities, indices = index.search(emb0.tolist(), k=5)
+
+        # Verify all similarities in [-1, 1] range (cosine similarity)
+        # Allow small tolerance for floating-point precision
+        for sim in similarities:
+            assert -1.0 - 1e-6 <= sim <= 1.0 + 1e-6
+
+        # Verify similarity scores are in descending order
+        for i in range(len(similarities) - 1):
+            assert similarities[i] >= similarities[i + 1]
+
+        # First result should be exact match (emb0 at index 0)
+        assert indices[0] == 0
+        assert math.isclose(similarities[0], 1.0, abs_tol=1e-6)
+
+        # Second result should be emb1 (index 1, high similarity)
+        assert indices[1] == 1
+        assert similarities[1] > 0.9  # Should be very similar
+
+    def test_l2_normalized_vectors_cosine_similarity(self):
+        """Test that L2-normalized identical vectors give cosine similarity ~1.0."""
+        index = SimilarityIndex()
+
+        # Create an L2-normalized embedding
+        embedding = np.random.randn(128).astype(np.float32)
+        embedding = embedding / np.linalg.norm(embedding)
+
+        # Verify it's normalized
+        norm = np.linalg.norm(embedding)
+        assert math.isclose(norm, 1.0, abs_tol=1e-6)
+
+        # Add to index
+        index.add([embedding.tolist()])
+
+        # Search with identical embedding
+        similarities, indices = index.search(embedding.tolist(), k=1)
+
+        # Cosine similarity should be 1.0 for identical L2-normalized vectors
+        assert len(similarities) == 1
+        assert len(indices) == 1
+        assert indices[0] == 0
+        assert math.isclose(similarities[0], 1.0, abs_tol=1e-6)
+
+    def test_ntotal_updates_correctly(self):
+        """Test that ntotal property updates correctly after multiple add() calls."""
+        index = SimilarityIndex()
+
+        # Initially empty
+        assert index.ntotal == 0
+
+        # Add 3 embeddings
+        embeddings_batch1 = []
+        for i in range(3):
+            emb = np.random.randn(128).astype(np.float32)
+            emb = emb / np.linalg.norm(emb)
+            embeddings_batch1.append(emb.tolist())
+
+        index.add(embeddings_batch1)
+        assert index.ntotal == 3
+
+        # Add 2 more embeddings
+        embeddings_batch2 = []
+        for i in range(2):
+            emb = np.random.randn(128).astype(np.float32)
+            emb = emb / np.linalg.norm(emb)
+            embeddings_batch2.append(emb.tolist())
+
+        index.add(embeddings_batch2)
+        assert index.ntotal == 5
+
+        # Add 4 more embeddings
+        embeddings_batch3 = []
+        for i in range(4):
+            emb = np.random.randn(128).astype(np.float32)
+            emb = emb / np.linalg.norm(emb)
+            embeddings_batch3.append(emb.tolist())
+
+        index.add(embeddings_batch3)
+        assert index.ntotal == 9
+
+        # Verify we can search and get all 9 results
+        query = embeddings_batch1[0]
+        similarities, indices = index.search(query, k=10)
+
+        # Should return all 9 embeddings
+        assert len(similarities) == 9
+        assert len(indices) == 9

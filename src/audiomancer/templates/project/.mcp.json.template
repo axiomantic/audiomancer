@@ -1,5 +1,9 @@
 {
   "mcpServers": {
+    "audiomancer": {
+      "command": "audiomancer",
+      "args": ["serve"]
+    },
     "filesystem": {
       "command": "npx",
       "args": [

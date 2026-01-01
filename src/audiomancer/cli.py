@@ -4,12 +4,13 @@ import sys
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 import typer
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 from rich import print as rprint
 
 app = typer.Typer(
@@ -18,6 +19,43 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 console = Console()
+
+
+def check_python_package(package_name: str, version_attr: str = "__version__") -> Tuple[bool, str]:
+    """Check if a Python package is importable via subprocess.
+
+    Uses subprocess to avoid importing heavy C++ libraries (essentia, tensorflow)
+    into the main process, which can cause mutex deadlocks.
+
+    Returns (success, version_or_error_message).
+    """
+    # Script to import package and print version
+    script = f"""
+import sys
+try:
+    import {package_name}
+    version = getattr({package_name}, '{version_attr}', 'installed')
+    print(version)
+    sys.exit(0)
+except ImportError as e:
+    print(str(e))
+    sys.exit(1)
+"""
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode == 0:
+            return True, result.stdout.strip()
+        else:
+            return False, result.stderr.strip() or result.stdout.strip()
+    except subprocess.TimeoutExpired:
+        return False, "check timed out"
+    except Exception as e:
+        return False, str(e)
 
 
 def get_config_dir() -> Path:
@@ -176,204 +214,276 @@ def init(
     console.print(f"\n[dim]Project directory: {project_path}[/dim]")
 
 
+def _check_python_version() -> Tuple[str, str, str, bool]:
+    """Check Python version."""
+    python_version = sys.version_info
+    version_str = f"{python_version.major}.{python_version.minor}.{python_version.micro}"
+    if python_version >= (3, 11):
+        return ("Python version", "[green]✓[/green]", version_str, True)
+    else:
+        return ("Python version", "[red]✗[/red]", f"{version_str} (3.11+ required)", False)
+
+
+def _check_supercollider() -> Tuple[str, str, str, bool]:
+    """Check SuperCollider installation."""
+    sclang_path = shutil.which("sclang")
+    if not sclang_path:
+        # Check macOS app bundle location
+        macos_sclang = Path("/Applications/SuperCollider.app/Contents/MacOS/sclang")
+        if macos_sclang.exists():
+            sclang_path = str(macos_sclang)
+
+    if sclang_path:
+        return ("SuperCollider (sclang)", "[green]✓[/green]", sclang_path, True)
+    else:
+        return ("SuperCollider (sclang)", "[red]✗[/red]", "Install from https://supercollider.github.io/downloads", False)
+
+
+def _check_tidal() -> Tuple[str, str, str, bool]:
+    """Check TidalCycles installation."""
+    ghci_path = shutil.which("ghci")
+    if not ghci_path:
+        return ("TidalCycles (ghci)", "[red]✗[/red]", "ghci not found. Install ghcup from https://www.haskell.org/ghcup/", False)
+
+    try:
+        result = subprocess.run(
+            [ghci_path, "-e", "import Sound.Tidal.Context"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode == 0:
+            return ("TidalCycles (ghci)", "[green]✓[/green]", ghci_path, True)
+        else:
+            return ("TidalCycles (ghci)", "[red]✗[/red]", "ghci found but TidalCycles not installed", False)
+    except subprocess.TimeoutExpired:
+        return ("TidalCycles (ghci)", "[yellow]![/yellow]", "ghci check timed out", True)
+    except Exception as e:
+        return ("TidalCycles (ghci)", "[yellow]![/yellow]", f"Error: {e}", True)
+
+
+def _check_ghc() -> Tuple[str, str, str, bool]:
+    """Check GHC installation."""
+    ghc_path = shutil.which("ghc")
+    if not ghc_path:
+        return ("GHC (Haskell compiler)", "[yellow]![/yellow]", "Not found (install ghcup)", True)
+
+    try:
+        result = subprocess.run(
+            [ghc_path, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            version = result.stdout.strip().split()[-1] if result.stdout else "unknown"
+            return ("GHC (Haskell compiler)", "[green]✓[/green]", f"{ghc_path} ({version})", True)
+        else:
+            return ("GHC (Haskell compiler)", "[yellow]![/yellow]", "ghc found but version check failed", True)
+    except subprocess.TimeoutExpired:
+        return ("GHC (Haskell compiler)", "[yellow]![/yellow]", "ghc version check timed out", True)
+    except Exception as e:
+        return ("GHC (Haskell compiler)", "[yellow]![/yellow]", f"Error: {e}", True)
+
+
 @app.command()
 def doctor():
     """Check dependencies and configuration."""
-    console.print("\n[bold]Running diagnostics...[/bold]\n")
+    console.print()
 
+    # Collect results as we go
+    results = []
+    all_passed = True
+
+    # Define all checks
+    required_packages = [
+        ("numpy", "__version__", "pip install numpy"),
+        ("librosa", "__version__", "pip install librosa"),
+        ("faiss", None, "pip install faiss-cpu"),
+        ("tensorflow", "__version__", "pip install tensorflow"),
+    ]
+    optional_packages = [
+        ("essentia", "__version__", "pip install essentia-tensorflow", "AI audio analysis"),
+    ]
+
+    # Calculate total checks: python + required_pkgs + optional_pkgs + sc + tidal + ghc + config
+    total_checks = 1 + len(required_packages) + len(optional_packages) + 4
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task("[cyan]Running diagnostics...", total=total_checks)
+
+        # Check Python version
+        progress.update(task, description="[cyan]Checking Python version...")
+        result = _check_python_version()
+        results.append(result)
+        if not result[3]:
+            all_passed = False
+        progress.advance(task)
+
+        # Check required packages
+        for pkg_name, version_attr, install_hint in required_packages:
+            progress.update(task, description=f"[cyan]Checking {pkg_name}...")
+            success, info = check_python_package(pkg_name, version_attr or "__version__")
+            if success:
+                results.append((pkg_name, "[green]✓[/green]", info if version_attr else "installed", True))
+            else:
+                results.append((pkg_name, "[red]✗[/red]", install_hint, False))
+                all_passed = False
+            progress.advance(task)
+
+        # Check optional packages
+        for pkg_name, version_attr, install_hint, feature in optional_packages:
+            progress.update(task, description=f"[cyan]Checking {pkg_name}...")
+            success, info = check_python_package(pkg_name, version_attr or "__version__")
+            if success:
+                results.append((pkg_name, "[green]✓[/green]", info if version_attr else "installed", True))
+            else:
+                results.append((pkg_name, "[yellow]![/yellow]", f"Optional ({feature}): {install_hint}", True))
+            progress.advance(task)
+
+        # Check SuperCollider
+        progress.update(task, description="[cyan]Checking SuperCollider...")
+        result = _check_supercollider()
+        results.append(result)
+        if not result[3]:
+            all_passed = False
+        progress.advance(task)
+
+        # Check TidalCycles
+        progress.update(task, description="[cyan]Checking TidalCycles...")
+        result = _check_tidal()
+        results.append(result)
+        if not result[3]:
+            all_passed = False
+        progress.advance(task)
+
+        # Check GHC
+        progress.update(task, description="[cyan]Checking GHC...")
+        result = _check_ghc()
+        results.append(result)
+        if not result[3]:
+            all_passed = False
+        progress.advance(task)
+
+        # Check global config
+        progress.update(task, description="[cyan]Checking config...")
+        config_path = get_config_dir() / "config.yaml"
+        if config_path.exists():
+            results.append(("global config", "[green]✓[/green]", str(config_path), True))
+        else:
+            results.append(("global config", "[yellow]![/yellow]", f"Run 'audiomancer init' to create", True))
+        progress.advance(task)
+
+    # Display results table
+    console.print()
     table = Table(show_header=True, header_style="bold cyan")
     table.add_column("Check", style="white")
     table.add_column("Status", justify="center")
     table.add_column("Details", style="dim")
 
-    all_passed = True
-
-    # Check Python version
-    python_version = sys.version_info
-    if python_version >= (3, 11):
-        table.add_row(
-            "Python version",
-            "[green]✓[/green]",
-            f"{python_version.major}.{python_version.minor}.{python_version.micro}",
-        )
-    else:
-        table.add_row(
-            "Python version",
-            "[red]✗[/red]",
-            f"{python_version.major}.{python_version.minor}.{python_version.micro} (3.11+ required)",
-        )
-        all_passed = False
-
-    # Check essentia
-    try:
-        import essentia
-
-        table.add_row("essentia", "[green]✓[/green]", essentia.__version__)
-    except ImportError:
-        table.add_row(
-            "essentia",
-            "[red]✗[/red]",
-            "pip install essentia-tensorflow",
-        )
-        all_passed = False
-
-    # Check tensorflow
-    try:
-        import tensorflow as tf
-
-        table.add_row("tensorflow", "[green]✓[/green]", tf.__version__)
-    except ImportError:
-        table.add_row(
-            "tensorflow",
-            "[red]✗[/red]",
-            "pip install tensorflow",
-        )
-        all_passed = False
-
-    # Check numpy
-    try:
-        import numpy as np
-
-        table.add_row("numpy", "[green]✓[/green]", np.__version__)
-    except ImportError:
-        table.add_row(
-            "numpy",
-            "[red]✗[/red]",
-            "pip install numpy",
-        )
-        all_passed = False
-
-    # Check librosa
-    try:
-        import librosa
-
-        table.add_row("librosa", "[green]✓[/green]", librosa.__version__)
-    except ImportError:
-        table.add_row(
-            "librosa",
-            "[red]✗[/red]",
-            "pip install librosa",
-        )
-        all_passed = False
-
-    # Check faiss
-    try:
-        import faiss
-
-        # faiss doesn't have __version__ in all builds
-        table.add_row("faiss", "[green]✓[/green]", "installed")
-    except ImportError:
-        table.add_row(
-            "faiss",
-            "[red]✗[/red]",
-            "pip install faiss-cpu",
-        )
-        all_passed = False
-
-    # Check SuperCollider (sclang)
-    sclang_path = shutil.which("sclang")
-    if sclang_path:
-        table.add_row("SuperCollider (sclang)", "[green]✓[/green]", sclang_path)
-    else:
-        table.add_row(
-            "SuperCollider (sclang)",
-            "[red]✗[/red]",
-            "Install from https://supercollider.github.io/downloads",
-        )
-        all_passed = False
-
-    # Check TidalCycles (ghci with Sound.Tidal.Context)
-    ghci_path = shutil.which("ghci")
-    if ghci_path:
-        # Try to import Sound.Tidal.Context
-        try:
-            result = subprocess.run(
-                [ghci_path, "-e", "import Sound.Tidal.Context"],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-            if result.returncode == 0:
-                table.add_row("TidalCycles (ghci)", "[green]✓[/green]", ghci_path)
-            else:
-                table.add_row(
-                    "TidalCycles (ghci)",
-                    "[red]✗[/red]",
-                    "ghci found but TidalCycles not installed. See https://tidalcycles.org/docs/getting-started/installation/",
-                )
-                all_passed = False
-        except subprocess.TimeoutExpired:
-            table.add_row(
-                "TidalCycles (ghci)",
-                "[yellow]![/yellow]",
-                "ghci check timed out",
-            )
-        except Exception as e:
-            table.add_row(
-                "TidalCycles (ghci)",
-                "[yellow]![/yellow]",
-                f"Error checking TidalCycles: {e}",
-            )
-    else:
-        table.add_row(
-            "TidalCycles (ghci)",
-            "[red]✗[/red]",
-            "ghci not found. Install ghcup from https://www.haskell.org/ghcup/",
-        )
-        all_passed = False
-
-    # Check GHC
-    ghc_path = shutil.which("ghc")
-    if ghc_path:
-        try:
-            result = subprocess.run(
-                [ghc_path, "--version"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if result.returncode == 0:
-                version = result.stdout.strip().split()[-1] if result.stdout else "unknown"
-                table.add_row("GHC (Haskell compiler)", "[green]✓[/green]", f"{ghc_path} ({version})")
-            else:
-                table.add_row(
-                    "GHC (Haskell compiler)",
-                    "[yellow]![/yellow]",
-                    "ghc found but version check failed",
-                )
-        except subprocess.TimeoutExpired:
-            table.add_row(
-                "GHC (Haskell compiler)",
-                "[yellow]![/yellow]",
-                "ghc version check timed out",
-            )
-        except Exception as e:
-            table.add_row(
-                "GHC (Haskell compiler)",
-                "[yellow]![/yellow]",
-                f"Error checking GHC: {e}",
-            )
-    else:
-        table.add_row(
-            "GHC (Haskell compiler)",
-            "[yellow]![/yellow]",
-            "Not found (install ghcup from https://www.haskell.org/ghcup/)",
-        )
-
-    # Check config
-    config_path = get_config_dir() / "config.yaml"
-    if config_path.exists():
-        table.add_row("config", "[green]✓[/green]", str(config_path))
-    else:
-        table.add_row(
-            "config",
-            "[yellow]![/yellow]",
-            f"Run 'audiomancer init' to create {config_path}",
-        )
-        all_passed = False
+    for name, status, details, _ in results:
+        table.add_row(name, status, details)
 
     console.print(table)
     console.print()
+
+    # Check project-local settings (if in a project directory)
+    cwd = Path.cwd()
+    project_config = cwd / ".audiomancer.yaml"
+    mcp_config = cwd / ".mcp.json"
+
+    # Detect if we're in a project directory
+    is_project = project_config.exists() or mcp_config.exists() or (cwd / "session.tidal").exists()
+
+    if is_project:
+        console.print("[bold]Project checks:[/bold]\n")
+        project_table = Table(show_header=True, header_style="bold cyan")
+        project_table.add_column("Check", style="white")
+        project_table.add_column("Status", justify="center")
+        project_table.add_column("Details", style="dim")
+
+        # Check .audiomancer.yaml
+        if project_config.exists():
+            project_table.add_row(".audiomancer.yaml", "[green]✓[/green]", str(project_config))
+        else:
+            project_table.add_row(
+                ".audiomancer.yaml",
+                "[yellow]![/yellow]",
+                "Optional project config (uses global defaults)",
+            )
+
+        # Check .mcp.json
+        if mcp_config.exists():
+            # Validate JSON
+            import json
+            try:
+                with open(mcp_config) as f:
+                    mcp_data = json.load(f)
+                if "mcpServers" in mcp_data and "audiomancer" in mcp_data.get("mcpServers", {}):
+                    project_table.add_row(".mcp.json", "[green]✓[/green]", "audiomancer server configured")
+                else:
+                    project_table.add_row(
+                        ".mcp.json",
+                        "[yellow]![/yellow]",
+                        "exists but audiomancer server not configured",
+                    )
+            except json.JSONDecodeError as e:
+                project_table.add_row(".mcp.json", "[red]✗[/red]", f"Invalid JSON: {e}")
+                all_passed = False
+        else:
+            project_table.add_row(
+                ".mcp.json",
+                "[red]✗[/red]",
+                "Missing - Claude won't detect this project",
+            )
+            all_passed = False
+
+        # Check project directories
+        required_dirs = ["library", "samples", "synths"]
+        for dir_name in required_dirs:
+            dir_path = cwd / dir_name
+            if dir_path.exists() and dir_path.is_dir():
+                # Count contents
+                count = len(list(dir_path.iterdir()))
+                project_table.add_row(f"{dir_name}/", "[green]✓[/green]", f"{count} items")
+            else:
+                project_table.add_row(
+                    f"{dir_name}/",
+                    "[yellow]![/yellow]",
+                    "Directory missing",
+                )
+
+        # Check session.tidal
+        session_file = cwd / "session.tidal"
+        if session_file.exists():
+            project_table.add_row("session.tidal", "[green]✓[/green]", "Ready for live coding")
+        else:
+            project_table.add_row(
+                "session.tidal",
+                "[yellow]![/yellow]",
+                "No session file - create one to start coding",
+            )
+
+        # Check start_superdirt.scd
+        superdirt_file = cwd / "start_superdirt.scd"
+        if superdirt_file.exists():
+            project_table.add_row("start_superdirt.scd", "[green]✓[/green]", "SuperDirt startup script")
+        else:
+            project_table.add_row(
+                "start_superdirt.scd",
+                "[red]✗[/red]",
+                "Missing - SuperDirt won't load custom samples",
+            )
+            all_passed = False
+
+        console.print(project_table)
+        console.print()
 
     if all_passed:
         console.print("[bold green]All checks passed! ✓[/bold green]\n")

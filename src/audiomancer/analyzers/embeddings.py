@@ -4,14 +4,24 @@ This module provides functions for extracting fixed-dimension audio embeddings
 for similarity search and clustering using pre-trained Essentia models.
 
 All embeddings are L2-normalized 128-dimensional vectors.
+
+Includes SimilarityIndex for fast nearest-neighbor search using FAISS.
 """
 
 import numpy as np
 import essentia.standard as es
-from typing import Literal
+from pathlib import Path
+from typing import Literal, Optional
 
 from ..errors import ModelLoadError, AnalysisFailedError
 from .models import load_model
+
+# FAISS is optional - only needed for SimilarityIndex
+try:
+    import faiss
+    FAISS_AVAILABLE = True
+except ImportError:
+    FAISS_AVAILABLE = False
 
 
 ModelType = Literal["musicnn", "vggish", "openl3"]
@@ -296,3 +306,162 @@ def euclidean_distance(embedding1: list[float], embedding2: list[float]) -> floa
     arr2 = np.array(embedding2, dtype=np.float32)
 
     return float(np.linalg.norm(arr1 - arr2))
+
+
+class SimilarityIndex:
+    """Fast similarity search index using FAISS.
+
+    Enables efficient nearest-neighbor search across thousands of audio embeddings.
+    Uses IndexFlatIP (inner product) which equals cosine similarity for L2-normalized vectors.
+
+    Example:
+        >>> # Build index from embeddings
+        >>> embeddings = [extract_audio_embedding(audio, sr) for audio in samples]
+        >>> index = SimilarityIndex()
+        >>> index.add(embeddings)
+        >>>
+        >>> # Search for similar samples
+        >>> query = extract_audio_embedding(query_audio, sr)
+        >>> similarities, indices = index.search(query, k=5)
+        >>>
+        >>> # Save/load for persistence
+        >>> index.save("samples.index")
+        >>> loaded = SimilarityIndex.load("samples.index")
+    """
+
+    def __init__(self, dimension: int = 128):
+        """Create a new similarity index.
+
+        Args:
+            dimension: Embedding dimension (default 128 for audiomancer)
+
+        Raises:
+            ImportError: If faiss-cpu is not installed
+        """
+        if not FAISS_AVAILABLE:
+            raise ImportError(
+                "faiss-cpu is required for SimilarityIndex. "
+                "Install with: pip install faiss-cpu"
+            )
+
+        self._dimension = dimension
+        # IndexFlatIP uses inner product (dot product)
+        # For L2-normalized vectors, this equals cosine similarity
+        self._index = faiss.IndexFlatIP(dimension)
+
+    @property
+    def dimension(self) -> int:
+        """Get the embedding dimension."""
+        return self._dimension
+
+    @property
+    def ntotal(self) -> int:
+        """Get the number of embeddings in the index."""
+        return self._index.ntotal
+
+    def add(self, embeddings: list[list[float]]) -> None:
+        """Add embeddings to the index.
+
+        Args:
+            embeddings: List of embedding vectors (each 128-dim, L2-normalized)
+
+        Raises:
+            ValueError: If embeddings have wrong dimension
+        """
+        if not embeddings:
+            return
+
+        # Convert to numpy array with correct dtype
+        arr = np.array(embeddings, dtype=np.float32)
+
+        if arr.ndim == 1:
+            arr = arr.reshape(1, -1)
+
+        if arr.shape[1] != self._dimension:
+            raise ValueError(
+                f"Expected {self._dimension}-dimensional embeddings, "
+                f"got {arr.shape[1]}"
+            )
+
+        self._index.add(arr)
+
+    def search(
+        self,
+        query: list[float],
+        k: int = 5,
+    ) -> tuple[list[float], list[int]]:
+        """Search for k most similar embeddings.
+
+        Args:
+            query: Query embedding (128-dim, L2-normalized)
+            k: Number of nearest neighbors to return
+
+        Returns:
+            Tuple of (similarities, indices):
+            - similarities: Cosine similarity scores (1.0 = identical)
+            - indices: Indices of matching embeddings in add() order
+
+        Raises:
+            ValueError: If query has wrong dimension or index is empty
+        """
+        if self._index.ntotal == 0:
+            raise ValueError("Index is empty. Add embeddings first.")
+
+        # Convert to numpy array
+        query_arr = np.array([query], dtype=np.float32)
+
+        if query_arr.shape[1] != self._dimension:
+            raise ValueError(
+                f"Expected {self._dimension}-dimensional query, "
+                f"got {query_arr.shape[1]}"
+            )
+
+        # Limit k to number of indexed vectors
+        k = min(k, self._index.ntotal)
+
+        # Search returns (distances, indices)
+        # For IndexFlatIP, "distances" are actually similarity scores
+        similarities, indices = self._index.search(query_arr, k)
+
+        return similarities[0].tolist(), indices[0].tolist()
+
+    def save(self, path: str | Path) -> None:
+        """Save the index to disk.
+
+        Args:
+            path: Path to save the index file
+        """
+        faiss.write_index(self._index, str(path))
+
+    @classmethod
+    def load(cls, path: str | Path) -> "SimilarityIndex":
+        """Load an index from disk.
+
+        Args:
+            path: Path to the index file
+
+        Returns:
+            Loaded SimilarityIndex
+
+        Raises:
+            ImportError: If faiss-cpu is not installed
+            FileNotFoundError: If index file doesn't exist
+        """
+        if not FAISS_AVAILABLE:
+            raise ImportError(
+                "faiss-cpu is required for SimilarityIndex. "
+                "Install with: pip install faiss-cpu"
+            )
+
+        path = Path(path)
+        if not path.exists():
+            raise FileNotFoundError(f"Index file not found: {path}")
+
+        index = faiss.read_index(str(path))
+
+        # Create instance and set the loaded index
+        instance = cls.__new__(cls)
+        instance._dimension = index.d
+        instance._index = index
+
+        return instance
