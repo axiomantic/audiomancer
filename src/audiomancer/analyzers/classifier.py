@@ -10,6 +10,7 @@ from typing import Optional
 
 from ..errors import AnalysisFailedError, ModelLoadError
 from .models import load_model
+from .model_cache import get_effnet_model, get_classifier_model
 
 
 # Instrument class mapping for MTG-Jamendo instrument model
@@ -106,13 +107,23 @@ def classify_instrument(
             import librosa
             audio = librosa.resample(audio, orig_sr=sr, target_sr=16000)
 
-        # Stage 1: Extract embeddings using discogs-effnet base model
-        effnet_path = str(load_model("discogs_effnet"))
-        effnet = es.TensorflowPredictEffnetDiscogs(
-            graphFilename=effnet_path,
-            output="PartitionedCall:1",
-        )
+        # Minimum length check - effnet needs ~1 second of audio
+        min_samples = 16000  # 1 second at 16kHz
+        if len(audio) < min_samples:
+            # Pad with zeros (silence) to minimum length
+            padding = np.zeros(min_samples - len(audio))
+            audio = np.concatenate([audio, padding])
+
+        # Stage 1: Extract embeddings using discogs-effnet base model (cached)
+        effnet = get_effnet_model()
         embeddings = effnet(audio)
+
+        # Check if embeddings are empty
+        if embeddings.size == 0:
+            raise AnalysisFailedError(
+                "Audio too short for classification",
+                details={"stage": "instrument classification", "audio_length": len(audio)}
+            )
 
         # Convert to numpy array if needed
         if not isinstance(embeddings, np.ndarray):
@@ -125,15 +136,16 @@ def classify_instrument(
         # Reshape to 2D for TensorflowPredict2D (expects [batch_size, features])
         embeddings_2d = embeddings.reshape(1, -1).astype(np.float32)
 
-        # Stage 2: Pass embeddings to classification head
+        # Stage 2: Pass embeddings to classification head (cached)
         if model_path is None:
-            model_path = str(load_model("mtg_jamendo_instrument"))
-
-        classifier = es.TensorflowPredict2D(
-            graphFilename=model_path,
-            input="model/Placeholder",
-            output="model/Sigmoid",
-        )
+            classifier = get_classifier_model("mtg_jamendo_instrument")
+        else:
+            # Custom model path - create new instance (not cached)
+            classifier = es.TensorflowPredict2D(
+                graphFilename=model_path,
+                input="model/Placeholder",
+                output="model/Sigmoid",
+            )
         predictions_2d = classifier(embeddings_2d)
 
         # Extract first (and only) batch element
@@ -210,13 +222,23 @@ def extract_mood_tags(
             import librosa
             audio = librosa.resample(audio, orig_sr=sr, target_sr=16000)
 
-        # Stage 1: Extract embeddings using discogs-effnet base model
-        effnet_path = str(load_model("discogs_effnet"))
-        effnet = es.TensorflowPredictEffnetDiscogs(
-            graphFilename=effnet_path,
-            output="PartitionedCall:1",
-        )
+        # Minimum length check - effnet needs ~1 second of audio
+        min_samples = 16000  # 1 second at 16kHz
+        if len(audio) < min_samples:
+            # Pad with zeros (silence) to minimum length
+            padding = np.zeros(min_samples - len(audio))
+            audio = np.concatenate([audio, padding])
+
+        # Stage 1: Extract embeddings using discogs-effnet base model (cached)
+        effnet = get_effnet_model()
         embeddings = effnet(audio)
+
+        # Check if embeddings are empty
+        if embeddings.size == 0:
+            raise AnalysisFailedError(
+                "Audio too short for mood classification",
+                details={"stage": "mood classification", "audio_length": len(audio)}
+            )
 
         # Convert to numpy array if needed
         if not isinstance(embeddings, np.ndarray):
@@ -229,13 +251,8 @@ def extract_mood_tags(
         # Reshape to 2D for TensorflowPredict2D (expects [batch_size, features])
         embeddings_2d = embeddings.reshape(1, -1).astype(np.float32)
 
-        # Stage 2: Pass embeddings to classification head
-        model_path = str(load_model("mtg_jamendo_moodtheme"))
-        classifier = es.TensorflowPredict2D(
-            graphFilename=model_path,
-            input="model/Placeholder",
-            output="model/Sigmoid",
-        )
+        # Stage 2: Pass embeddings to classification head (cached)
+        classifier = get_classifier_model("mtg_jamendo_moodtheme")
         predictions_2d = classifier(embeddings_2d)
 
         # Extract first (and only) batch element
@@ -307,13 +324,23 @@ def extract_genre_tags(
             import librosa
             audio = librosa.resample(audio, orig_sr=sr, target_sr=16000)
 
-        # Stage 1: Extract embeddings using discogs-effnet base model
-        effnet_path = str(load_model("discogs_effnet"))
-        effnet = es.TensorflowPredictEffnetDiscogs(
-            graphFilename=effnet_path,
-            output="PartitionedCall:1",
-        )
+        # Minimum length check - effnet needs ~1 second of audio
+        min_samples = 16000  # 1 second at 16kHz
+        if len(audio) < min_samples:
+            # Pad with zeros (silence) to minimum length
+            padding = np.zeros(min_samples - len(audio))
+            audio = np.concatenate([audio, padding])
+
+        # Stage 1: Extract embeddings using discogs-effnet base model (cached)
+        effnet = get_effnet_model()
         embeddings = effnet(audio)
+
+        # Check if embeddings are empty
+        if embeddings.size == 0:
+            raise AnalysisFailedError(
+                "Audio too short for genre classification",
+                details={"stage": "genre classification", "audio_length": len(audio)}
+            )
 
         # Convert to numpy array if needed
         if not isinstance(embeddings, np.ndarray):
@@ -326,13 +353,8 @@ def extract_genre_tags(
         # Reshape to 2D for TensorflowPredict2D (expects [batch_size, features])
         embeddings_2d = embeddings.reshape(1, -1).astype(np.float32)
 
-        # Stage 2: Pass embeddings to classification head
-        model_path = str(load_model("mtg_jamendo_genre"))
-        classifier = es.TensorflowPredict2D(
-            graphFilename=model_path,
-            input="model/Placeholder",
-            output="model/Sigmoid",
-        )
+        # Stage 2: Pass embeddings to classification head (cached)
+        classifier = get_classifier_model("mtg_jamendo_genre")
         predictions_2d = classifier(embeddings_2d)
 
         # Extract first (and only) batch element

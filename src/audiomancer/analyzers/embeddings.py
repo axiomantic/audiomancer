@@ -15,6 +15,7 @@ from typing import Literal, Optional
 
 from ..errors import ModelLoadError, AnalysisFailedError
 from .models import load_model
+from .model_cache import get_embedding_model
 
 # FAISS is optional - only needed for SimilarityIndex
 try:
@@ -62,10 +63,6 @@ def extract_audio_embedding(
         True
     """
     try:
-        # Load model
-        model_path_obj = load_model(model)
-        model_path = str(model_path_obj)
-
         # Ensure mono audio
         if audio.ndim > 1:
             audio = np.mean(audio, axis=0)
@@ -77,13 +74,16 @@ def extract_audio_embedding(
             import librosa
             audio = librosa.resample(audio, orig_sr=sr, target_sr=target_sr)
 
+        # Get cached model and extract embedding
+        embedding_extractor = get_embedding_model(model)
+
         # Extract embedding based on model type
         if model == "musicnn":
-            embedding = _extract_musicnn_embedding(audio, model_path)
+            embedding = _extract_musicnn_embedding_cached(audio, embedding_extractor)
         elif model == "vggish":
-            embedding = _extract_vggish_embedding(audio, model_path)
+            embedding = _extract_vggish_embedding_cached(audio, embedding_extractor)
         elif model == "openl3":
-            embedding = _extract_openl3_embedding(audio, model_path)
+            embedding = _extract_openl3_embedding_cached(audio, embedding_extractor)
         else:
             raise ModelLoadError(
                 f"Unknown embedding model: {model}",
@@ -137,22 +137,16 @@ def extract_audio_embedding(
         )
 
 
-def _extract_musicnn_embedding(audio: np.ndarray, model_path: str) -> np.ndarray:
-    """Extract MusiCNN embedding.
+def _extract_musicnn_embedding_cached(audio: np.ndarray, model: es.TensorflowPredict) -> np.ndarray:
+    """Extract MusiCNN embedding using cached model.
 
     Args:
         audio: Audio samples (mono, 16kHz)
-        model_path: Path to MusiCNN model file
+        model: Cached TensorflowPredictMusiCNN instance
 
     Returns:
         128-dimensional embedding vector
     """
-    # Use TensorflowPredictMusiCNN for MusiCNN embeddings
-    model = es.TensorflowPredictMusiCNN(
-        graphFilename=model_path,
-        output="model/dense/BiasAdd",
-    )
-
     # Extract embedding
     embedding = model(audio)
 
@@ -176,22 +170,16 @@ def _extract_musicnn_embedding(audio: np.ndarray, model_path: str) -> np.ndarray
         return embedding
 
 
-def _extract_vggish_embedding(audio: np.ndarray, model_path: str) -> np.ndarray:
-    """Extract VGGish embedding.
+def _extract_vggish_embedding_cached(audio: np.ndarray, model: es.TensorflowPredict) -> np.ndarray:
+    """Extract VGGish embedding using cached model.
 
     Args:
         audio: Audio samples (mono, 16kHz)
-        model_path: Path to VGGish model file
+        model: Cached TensorflowPredictVGGish instance
 
     Returns:
         128-dimensional embedding vector
     """
-    # Use TensorflowPredictVGGish for VGGish embeddings
-    model = es.TensorflowPredictVGGish(
-        graphFilename=model_path,
-        output="model/vggish/fc2/BiasAdd",
-    )
-
     # VGGish processes audio in 0.96s windows
     # We'll extract embeddings for all windows and average
     embeddings = model(audio)
@@ -214,23 +202,16 @@ def _extract_vggish_embedding(audio: np.ndarray, model_path: str) -> np.ndarray:
     return embedding
 
 
-def _extract_openl3_embedding(audio: np.ndarray, model_path: str) -> np.ndarray:
-    """Extract OpenL3 embedding.
+def _extract_openl3_embedding_cached(audio: np.ndarray, model: es.TensorflowPredict) -> np.ndarray:
+    """Extract OpenL3 embedding using cached model.
 
     Args:
         audio: Audio samples (mono, 16kHz)
-        model_path: Path to OpenL3 model file
+        model: Cached TensorflowPredict instance
 
     Returns:
         128-dimensional embedding vector
     """
-    # OpenL3 uses similar approach to VGGish
-    # Use generic TensorflowPredict with appropriate layer
-    model = es.TensorflowPredict(
-        graphFilename=model_path,
-        output="model/openl3/embedding",
-    )
-
     # Extract embedding
     embeddings = model(audio)
 

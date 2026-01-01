@@ -17,9 +17,10 @@ from tests.utils import create_test_audio
 class TestEmbeddingExtraction:
     """Test audio embedding extraction."""
 
+    @patch("audiomancer.analyzers.embeddings.get_embedding_model")
     @patch("audiomancer.analyzers.embeddings.load_model")
-    @patch("audiomancer.analyzers.embeddings._extract_musicnn_embedding")
-    def test_extract_musicnn_embedding_success(self, mock_extract, mock_load, tmp_path):
+    @patch("audiomancer.analyzers.embeddings._extract_musicnn_embedding_cached")
+    def test_extract_musicnn_embedding_cached_success(self, mock_extract, mock_load, mock_get_embedding, tmp_path):
         """Test successful MusiCNN embedding extraction."""
         # Mock model loading
         model_path = tmp_path / "musicnn.pb"
@@ -44,9 +45,10 @@ class TestEmbeddingExtraction:
         norm = math.sqrt(sum(x**2 for x in embedding))
         assert math.isclose(norm, 1.0, abs_tol=1e-6)
 
+    @patch("audiomancer.analyzers.embeddings.get_embedding_model")
     @patch("audiomancer.analyzers.embeddings.load_model")
-    @patch("audiomancer.analyzers.embeddings._extract_vggish_embedding")
-    def test_extract_vggish_embedding_success(self, mock_extract, mock_load, tmp_path):
+    @patch("audiomancer.analyzers.embeddings._extract_vggish_embedding_cached")
+    def test_extract_vggish_embedding_cached_success(self, mock_extract, mock_load, mock_get_embedding, tmp_path):
         """Test successful VGGish embedding extraction."""
         # Mock model loading
         model_path = tmp_path / "vggish.pb"
@@ -70,9 +72,10 @@ class TestEmbeddingExtraction:
         norm = math.sqrt(sum(x**2 for x in embedding))
         assert math.isclose(norm, 1.0, abs_tol=1e-6)
 
+    @patch("audiomancer.analyzers.embeddings.get_embedding_model")
     @patch("audiomancer.analyzers.embeddings.load_model")
-    @patch("audiomancer.analyzers.embeddings._extract_openl3_embedding")
-    def test_extract_openl3_embedding_success(self, mock_extract, mock_load, tmp_path):
+    @patch("audiomancer.analyzers.embeddings._extract_openl3_embedding_cached")
+    def test_extract_openl3_embedding_cached_success(self, mock_extract, mock_load, mock_get_embedding, tmp_path):
         """Test successful OpenL3 embedding extraction."""
         # Mock model loading
         model_path = tmp_path / "openl3.pb"
@@ -96,6 +99,7 @@ class TestEmbeddingExtraction:
         norm = math.sqrt(sum(x**2 for x in embedding))
         assert math.isclose(norm, 1.0, abs_tol=1e-6)
 
+    @patch("audiomancer.analyzers.embeddings.get_embedding_model")
     @patch("audiomancer.analyzers.embeddings.load_model")
     def test_extract_embedding_invalid_model(self, mock_load, tmp_path):
         """Test embedding extraction with invalid model type."""
@@ -109,8 +113,9 @@ class TestEmbeddingExtraction:
         with pytest.raises(ModelLoadError):
             extract_audio_embedding(audio, 44100, model="invalid_model")
 
+    @patch("audiomancer.analyzers.embeddings.get_embedding_model")
     @patch("audiomancer.analyzers.embeddings.load_model")
-    @patch("audiomancer.analyzers.embeddings._extract_musicnn_embedding")
+    @patch("audiomancer.analyzers.embeddings._extract_musicnn_embedding_cached")
     def test_extract_embedding_wrong_dimension(self, mock_extract, mock_load, tmp_path):
         """Test that wrong-dimension embeddings raise error."""
         # Mock model
@@ -128,8 +133,9 @@ class TestEmbeddingExtraction:
 
         assert "128-dimensional" in str(exc_info.value)
 
+    @patch("audiomancer.analyzers.embeddings.get_embedding_model")
     @patch("audiomancer.analyzers.embeddings.load_model")
-    @patch("audiomancer.analyzers.embeddings._extract_musicnn_embedding")
+    @patch("audiomancer.analyzers.embeddings._extract_musicnn_embedding_cached")
     def test_extract_embedding_zero_norm(self, mock_extract, mock_load, tmp_path):
         """Test that zero-norm embeddings raise error."""
         # Mock model
@@ -147,8 +153,9 @@ class TestEmbeddingExtraction:
 
         assert "zero-norm" in str(exc_info.value).lower()
 
+    @patch("audiomancer.analyzers.embeddings.get_embedding_model")
     @patch("audiomancer.analyzers.embeddings.load_model")
-    @patch("audiomancer.analyzers.embeddings._extract_musicnn_embedding")
+    @patch("audiomancer.analyzers.embeddings._extract_musicnn_embedding_cached")
     def test_extract_embedding_stereo_to_mono(self, mock_extract, mock_load, tmp_path):
         """Test that stereo audio is converted to mono."""
         # Mock model
@@ -167,8 +174,9 @@ class TestEmbeddingExtraction:
         # Should succeed
         assert len(embedding) == 128
 
+    @patch("audiomancer.analyzers.embeddings.get_embedding_model")
     @patch("audiomancer.analyzers.embeddings.load_model")
-    @patch("audiomancer.analyzers.embeddings._extract_musicnn_embedding")
+    @patch("audiomancer.analyzers.embeddings._extract_musicnn_embedding_cached")
     def test_extract_embedding_resampling(self, mock_extract, mock_load, tmp_path):
         """Test that audio is resampled to 16kHz."""
         # Mock model
@@ -190,8 +198,9 @@ class TestEmbeddingExtraction:
 class TestEmbeddingNormalization:
     """Test L2 normalization of embeddings."""
 
+    @patch("audiomancer.analyzers.embeddings.get_embedding_model")
     @patch("audiomancer.analyzers.embeddings.load_model")
-    @patch("audiomancer.analyzers.embeddings._extract_musicnn_embedding")
+    @patch("audiomancer.analyzers.embeddings._extract_musicnn_embedding_cached")
     def test_embedding_l2_normalized(self, mock_extract, mock_load, tmp_path):
         """Test that embeddings are L2 normalized."""
         # Mock model
@@ -213,8 +222,9 @@ class TestEmbeddingNormalization:
         # Should be normalized to 1.0
         assert math.isclose(norm, 1.0, abs_tol=1e-6)
 
+    @patch("audiomancer.analyzers.embeddings.get_embedding_model")
     @patch("audiomancer.analyzers.embeddings.load_model")
-    @patch("audiomancer.analyzers.embeddings._extract_musicnn_embedding")
+    @patch("audiomancer.analyzers.embeddings._extract_musicnn_embedding_cached")
     def test_multiple_embeddings_consistent_norm(self, mock_extract, mock_load, tmp_path):
         """Test that multiple embeddings all have norm 1.0."""
         # Mock model
@@ -328,8 +338,9 @@ class TestSimilarityFunctions:
 class TestEmbeddingConsistency:
     """Test that embeddings are consistent and reproducible."""
 
+    @patch("audiomancer.analyzers.embeddings.get_embedding_model")
     @patch("audiomancer.analyzers.embeddings.load_model")
-    @patch("audiomancer.analyzers.embeddings._extract_musicnn_embedding")
+    @patch("audiomancer.analyzers.embeddings._extract_musicnn_embedding_cached")
     def test_same_audio_same_embedding(self, mock_extract, mock_load, tmp_path):
         """Test that same audio produces same embedding."""
         # Mock model

@@ -17,6 +17,7 @@ dependencies = [
     "numpy>=1.24.0,<2",
     "faiss-cpu>=1.7.0",
     "tensorflow>=2.10.0,<2.13",
+    "tensorflow-metal>=1.0.0,<2; sys_platform == 'darwin' and platform_machine == 'arm64'",
 
     # Storage
     "lancedb>=0.4.0,<0.5",

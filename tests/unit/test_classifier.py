@@ -71,11 +71,11 @@ class TestInstrumentClassification:
         confidences = [conf for _, conf in result["top_predictions"]]
         assert confidences == sorted(confidences, reverse=True)
 
-    @patch("audiomancer.analyzers.classifier.load_model")
-    def test_classify_instrument_model_load_error(self, mock_load):
+    @patch("audiomancer.analyzers.classifier.get_effnet_model")
+    def test_classify_instrument_model_load_error(self, mock_effnet):
         """Test classification with model load error."""
         # Mock model loading to fail
-        mock_load.side_effect = ModelLoadError("Model not found", details={})
+        mock_effnet.side_effect = ModelLoadError("Model not found", details={})
 
         # Create test audio
         audio = create_test_audio(duration=1.0)
@@ -156,6 +156,40 @@ class TestInstrumentClassification:
 
         # Should succeed (was resampled to 16kHz)
         assert result["instrument_type"] in INSTRUMENT_CLASSES
+
+    @patch("audiomancer.analyzers.classifier.get_classifier_model")
+    @patch("audiomancer.analyzers.classifier.get_effnet_model")
+    def test_classify_instrument_short_audio_padding(
+        self, mock_get_effnet, mock_get_classifier
+    ):
+        """Test that short audio is padded to minimum length."""
+        # Mock embedding extractor - verify it receives padded audio
+        mock_effnet = MagicMock()
+        embeddings = np.random.rand(3, 1280).astype(np.float32)
+        mock_effnet.return_value = embeddings
+        mock_get_effnet.return_value = mock_effnet
+
+        # Mock classifier
+        mock_classifier = MagicMock()
+        predictions_batch = np.zeros((1, 40), dtype=np.float32)
+        predictions_batch[0, 13] = 0.9  # drums
+        mock_classifier.return_value = predictions_batch
+        mock_get_classifier.return_value = mock_classifier
+
+        # Create very short audio (0.1 seconds at 44.1kHz = ~4410 samples)
+        # After resampling to 16kHz, this becomes ~1600 samples (< 16000)
+        audio = create_test_audio(duration=0.1, sample_rate=44100)
+
+        # Classify
+        result = classify_instrument(audio, 44100)
+
+        # Should succeed - audio was padded to minimum length
+        assert result["instrument_type"] in INSTRUMENT_CLASSES
+        assert result["instrument_confidence"] > 0
+
+        # Verify effnet was called with padded audio (>= 16000 samples at 16kHz)
+        called_audio = mock_effnet.call_args[0][0]
+        assert len(called_audio) >= 16000
 
 
 class TestMoodClassification:
@@ -284,11 +318,11 @@ class TestGenreClassification:
         for genre in genres:
             assert genre in GENRE_CLASSES
 
-    @patch("audiomancer.analyzers.classifier.load_model")
-    def test_extract_genre_tags_model_error(self, mock_load):
+    @patch("audiomancer.analyzers.classifier.get_effnet_model")
+    def test_extract_genre_tags_model_error(self, mock_effnet):
         """Test genre extraction with model error."""
         # Mock model loading to fail
-        mock_load.side_effect = ModelLoadError("Model not found", details={})
+        mock_effnet.side_effect = ModelLoadError("Model not found", details={})
 
         audio = create_test_audio(duration=1.0)
 
