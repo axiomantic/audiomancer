@@ -536,7 +536,7 @@ def _analyze_single_file(file_path: Path) -> dict:
     classification = classify_instrument(audio, sr)
 
     # Extract embedding
-    embedding = extract_audio_embedding(file_path)
+    embedding = extract_audio_embedding(audio, sr)
 
     # Combine all metadata
     sample_metadata = {
@@ -719,7 +719,7 @@ def scan(
                     classification = classify_instrument(audio, sr)
 
                     # Extract embedding
-                    embedding = extract_audio_embedding(file_path)
+                    embedding = extract_audio_embedding(audio, sr)
 
                     # Combine all metadata
                     sample_metadata = {
@@ -745,7 +745,14 @@ def scan(
 
                 except Exception as e:
                     errors += 1
-                    console.print(f"[red]Error processing {file_path.name}: {e}[/red]")
+                    # Show error with details from AudiomancerError
+                    error_msg = str(e)
+                    if hasattr(e, 'details') and e.details:
+                        if 'stage' in e.details:
+                            error_msg += f" (stage: {e.details['stage']})"
+                        if 'error' in e.details:
+                            error_msg += f"\n  Cause: {e.details['error']}"
+                    console.print(f"[red]Error: {file_path.name}: {error_msg}[/red]")
 
                 progress.advance(task)
 
