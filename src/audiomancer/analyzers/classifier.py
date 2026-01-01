@@ -114,11 +114,17 @@ def classify_instrument(
             output="PartitionedCall:1",
         )
 
-        # Get embeddings and predictions
-        embeddings = model(audio)
+        # Get predictions (2D array: [num_patches, num_classes])
+        predictions_2d = model(audio)
+
+        # Average across time to get single prediction per class
+        if predictions_2d.ndim == 2:
+            predictions_1d = np.mean(predictions_2d, axis=0)
+        else:
+            predictions_1d = predictions_2d
 
         # Apply softmax to get probabilities
-        predictions = np.exp(embeddings) / np.sum(np.exp(embeddings))
+        predictions = np.exp(predictions_1d) / np.sum(np.exp(predictions_1d))
 
         # Get top-k predictions
         top_indices = np.argsort(predictions)[-top_k:][::-1]
@@ -198,8 +204,17 @@ def extract_mood_tags(
             output="PartitionedCall:1",
         )
 
-        embeddings = model(audio)
-        predictions = np.exp(embeddings) / np.sum(np.exp(embeddings))
+        # Get predictions (2D array: [num_patches, num_classes])
+        predictions_2d = model(audio)
+
+        # Average across time to get single prediction per class
+        if predictions_2d.ndim == 2:
+            predictions_1d = np.mean(predictions_2d, axis=0)
+        else:
+            predictions_1d = predictions_2d
+
+        # Apply softmax to get probabilities
+        predictions = np.exp(predictions_1d) / np.sum(np.exp(predictions_1d))
 
         # Filter by threshold and get top-k
         filtered_indices = np.where(predictions >= threshold)[0]
@@ -274,8 +289,17 @@ def extract_genre_tags(
             output="PartitionedCall:1",
         )
 
-        embeddings = model(audio)
-        predictions = np.exp(embeddings) / np.sum(np.exp(embeddings))
+        # Get predictions (2D array: [num_patches, num_classes])
+        predictions_2d = model(audio)
+
+        # Average across time to get single prediction per class
+        if predictions_2d.ndim == 2:
+            predictions_1d = np.mean(predictions_2d, axis=0)
+        else:
+            predictions_1d = predictions_2d
+
+        # Apply softmax to get probabilities
+        predictions = np.exp(predictions_1d) / np.sum(np.exp(predictions_1d))
 
         # Filter by threshold and get top-k
         filtered_indices = np.where(predictions >= threshold)[0]
