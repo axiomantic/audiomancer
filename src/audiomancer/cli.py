@@ -510,10 +510,59 @@ def serve():
         sys.exit(1)
 
 
+def _analyze_single_file(file_path: Path) -> dict:
+    """Analyze a single audio file. For use in parallel processing."""
+    from datetime import datetime
+    from audiomancer.analyzers.basic import get_basic_metadata
+    from audiomancer.analyzers.spectral import extract_spectral_features
+    from audiomancer.analyzers.rhythm import extract_rhythm_features
+    from audiomancer.analyzers.tonal import extract_tonal_features
+    from audiomancer.analyzers.embeddings import extract_audio_embedding
+    from audiomancer.analyzers.classifier import classify_instrument
+    import librosa
+
+    # Extract basic metadata
+    basic = get_basic_metadata(file_path)
+
+    # Load audio for feature extraction
+    audio, sr = librosa.load(str(file_path), sr=None, mono=False)
+
+    # Extract features
+    spectral = extract_spectral_features(audio, sr)
+    rhythm = extract_rhythm_features(audio, sr)
+    tonal = extract_tonal_features(audio, sr)
+
+    # Classify instrument
+    classification = classify_instrument(audio, sr)
+
+    # Extract embedding
+    embedding = extract_audio_embedding(file_path)
+
+    # Combine all metadata
+    sample_metadata = {
+        'file_path': str(file_path.absolute()),
+        **basic,
+        **spectral,
+        **rhythm,
+        **tonal,
+        'instrument_type': classification['instrument_type'],
+        'instrument_confidence': classification['confidence'],
+        'created_at': datetime.now(),
+        'updated_at': datetime.now(),
+    }
+
+    return {
+        'metadata': sample_metadata,
+        'embedding': embedding,
+        'file_hash': basic['file_hash'],
+    }
+
+
 @app.command()
 def scan(
     path: Optional[Path] = typer.Argument(None, help="Directory to scan"),
     recursive: bool = typer.Option(True, help="Scan subdirectories"),
+    workers: int = typer.Option(1, "--workers", "-w", help="Number of parallel workers (default: 1)"),
 ):
     """Index sample/synth folders."""
     import time
@@ -523,13 +572,6 @@ def scan(
     from audiomancer.config import load_config
     from audiomancer.storage.db import SampleStore
     from audiomancer.storage.vectors import LanceDBVectorStore
-    from audiomancer.analyzers.basic import get_basic_metadata
-    from audiomancer.analyzers.spectral import extract_spectral_features
-    from audiomancer.analyzers.rhythm import extract_rhythm_features
-    from audiomancer.analyzers.tonal import extract_tonal_features
-    from audiomancer.analyzers.embeddings import extract_audio_embedding
-    from audiomancer.analyzers.classifier import classify_instrument
-    import librosa
 
     start_time = time.time()
 
@@ -589,61 +631,123 @@ def scan(
     ) as progress:
         task = progress.add_task(f"Scanning {len(all_files)} files...", total=len(all_files))
 
-        for file_path in all_files:
-            try:
-                progress.update(task, description=f"Analyzing {file_path.name}...")
+        if workers > 1:
+            # Parallel processing with ProcessPoolExecutor
+            from concurrent.futures import ProcessPoolExecutor, as_completed
 
-                # Extract basic metadata
-                basic = get_basic_metadata(file_path)
+            # Filter out already-indexed files first (quick hash check)
+            from audiomancer.analyzers.basic import get_basic_metadata
 
-                # Check if already in database
-                existing = sample_store.get_by_hash(basic['file_hash'])
-                if existing:
-                    skipped += 1
+            files_to_process = []
+            for file_path in all_files:
+                try:
+                    # Quick hash check
+                    basic = get_basic_metadata(file_path)
+                    if sample_store.get_by_hash(basic['file_hash']):
+                        skipped += 1
+                        progress.advance(task)
+                    else:
+                        files_to_process.append(file_path)
+                except Exception as e:
+                    errors += 1
+                    console.print(f"[red]Error checking {file_path.name}: {e}[/red]")
                     progress.advance(task)
-                    continue
 
-                # Load audio for feature extraction
-                audio, sr = librosa.load(str(file_path), sr=None, mono=False)
-
-                # Extract features
-                spectral = extract_spectral_features(audio, sr)
-                rhythm = extract_rhythm_features(audio, sr)
-                tonal = extract_tonal_features(audio, sr)
-
-                # Classify instrument
-                classification = classify_instrument(audio, sr)
-
-                # Extract embedding
-                embedding = extract_audio_embedding(file_path)
-
-                # Combine all metadata
-                sample_metadata = {
-                    'file_path': str(file_path.absolute()),
-                    **basic,
-                    **spectral,
-                    **rhythm,
-                    **tonal,
-                    'instrument_type': classification['instrument_type'],
-                    'instrument_confidence': classification['confidence'],
-                    'created_at': datetime.now(),
-                    'updated_at': datetime.now(),
+            # Process files in parallel
+            with ProcessPoolExecutor(max_workers=workers) as executor:
+                # Submit all analysis jobs
+                future_to_file = {
+                    executor.submit(_analyze_single_file, file_path): file_path
+                    for file_path in files_to_process
                 }
 
-                # Store sample
-                sample_id = sample_store.add(sample_metadata)
+                # Process results as they complete
+                for future in as_completed(future_to_file):
+                    file_path = future_to_file[future]
+                    try:
+                        progress.update(task, description=f"Processing {file_path.name}...")
+                        result = future.result()
 
-                # Store embedding
-                if embedding is not None:
-                    vector_store.add_embedding(sample_id, embedding)
+                        # Store sample
+                        sample_id = sample_store.add(result['metadata'])
 
-                scanned += 1
+                        # Store embedding
+                        if result['embedding'] is not None:
+                            vector_store.add_embedding(sample_id, result['embedding'])
 
-            except Exception as e:
-                errors += 1
-                console.print(f"[red]Error processing {file_path.name}: {e}[/red]")
+                        scanned += 1
 
-            progress.advance(task)
+                    except Exception as e:
+                        errors += 1
+                        console.print(f"[red]Error processing {file_path.name}: {e}[/red]")
+
+                    progress.advance(task)
+
+        else:
+            # Sequential processing (original code)
+            from audiomancer.analyzers.basic import get_basic_metadata
+            from audiomancer.analyzers.spectral import extract_spectral_features
+            from audiomancer.analyzers.rhythm import extract_rhythm_features
+            from audiomancer.analyzers.tonal import extract_tonal_features
+            from audiomancer.analyzers.embeddings import extract_audio_embedding
+            from audiomancer.analyzers.classifier import classify_instrument
+            import librosa
+
+            for file_path in all_files:
+                try:
+                    progress.update(task, description=f"Analyzing {file_path.name}...")
+
+                    # Extract basic metadata
+                    basic = get_basic_metadata(file_path)
+
+                    # Check if already in database
+                    existing = sample_store.get_by_hash(basic['file_hash'])
+                    if existing:
+                        skipped += 1
+                        progress.advance(task)
+                        continue
+
+                    # Load audio for feature extraction
+                    audio, sr = librosa.load(str(file_path), sr=None, mono=False)
+
+                    # Extract features
+                    spectral = extract_spectral_features(audio, sr)
+                    rhythm = extract_rhythm_features(audio, sr)
+                    tonal = extract_tonal_features(audio, sr)
+
+                    # Classify instrument
+                    classification = classify_instrument(audio, sr)
+
+                    # Extract embedding
+                    embedding = extract_audio_embedding(file_path)
+
+                    # Combine all metadata
+                    sample_metadata = {
+                        'file_path': str(file_path.absolute()),
+                        **basic,
+                        **spectral,
+                        **rhythm,
+                        **tonal,
+                        'instrument_type': classification['instrument_type'],
+                        'instrument_confidence': classification['confidence'],
+                        'created_at': datetime.now(),
+                        'updated_at': datetime.now(),
+                    }
+
+                    # Store sample
+                    sample_id = sample_store.add(sample_metadata)
+
+                    # Store embedding
+                    if embedding is not None:
+                        vector_store.add_embedding(sample_id, embedding)
+
+                    scanned += 1
+
+                except Exception as e:
+                    errors += 1
+                    console.print(f"[red]Error processing {file_path.name}: {e}[/red]")
+
+                progress.advance(task)
 
     # Print summary
     elapsed = time.time() - start_time
