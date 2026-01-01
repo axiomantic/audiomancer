@@ -804,6 +804,80 @@ class SampleStore:
         finally:
             session.close()
 
+    def get_bpm_distribution(self) -> dict[str, int]:
+        """Get distribution of samples by BPM ranges.
+
+        Returns:
+            Dictionary mapping BPM ranges to sample counts
+
+        Example:
+            >>> distribution = store.get_bpm_distribution()
+            >>> distribution
+            {'<100': 5, '100-120': 23, '120-140': 45, '140-160': 12, '160+': 3}
+        """
+        session = self.SessionLocal()
+        try:
+            # Query all samples with BPM
+            samples_with_bpm = (
+                session.query(Sample.bpm)
+                .filter(Sample.bpm.isnot(None))
+                .all()
+            )
+
+            # Categorize into ranges
+            ranges = {
+                '<100': 0,
+                '100-120': 0,
+                '120-140': 0,
+                '140-160': 0,
+                '160+': 0,
+            }
+
+            for (bpm,) in samples_with_bpm:
+                if bpm < 100:
+                    ranges['<100'] += 1
+                elif bpm < 120:
+                    ranges['100-120'] += 1
+                elif bpm < 140:
+                    ranges['120-140'] += 1
+                elif bpm < 160:
+                    ranges['140-160'] += 1
+                else:
+                    ranges['160+'] += 1
+
+            return ranges
+
+        finally:
+            session.close()
+
+    def get_key_distribution(self) -> dict[str, int]:
+        """Get distribution of samples by musical key.
+
+        Returns:
+            Dictionary mapping keys to sample counts
+
+        Example:
+            >>> distribution = store.get_key_distribution()
+            >>> distribution
+            {'C': 15, 'A': 12, 'D': 8, 'G': 10}
+        """
+        session = self.SessionLocal()
+        try:
+            # Query for key counts
+            from sqlalchemy import func
+
+            results = (
+                session.query(Sample.key, func.count(Sample.id))
+                .filter(Sample.key.isnot(None))
+                .group_by(Sample.key)
+                .all()
+            )
+
+            return {key: count for key, count in results}
+
+        finally:
+            session.close()
+
 
 # TODO: Implement PatternStore following the same patterns
 # For now, it's a placeholder to complete the module structure

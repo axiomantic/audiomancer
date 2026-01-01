@@ -516,32 +516,291 @@ def scan(
     recursive: bool = typer.Option(True, help="Scan subdirectories"),
 ):
     """Index sample/synth folders."""
-    console.print("[yellow]Scanning not yet implemented[/yellow]")
+    import time
+    from datetime import datetime
+
+    # Lazy imports to avoid heavy dependencies at startup
+    from audiomancer.config import load_config
+    from audiomancer.storage.db import SampleStore
+    from audiomancer.storage.vectors import LanceDBVectorStore
+    from audiomancer.analyzers.basic import get_basic_metadata
+    from audiomancer.analyzers.spectral import extract_spectral_features
+    from audiomancer.analyzers.rhythm import extract_rhythm_features
+    from audiomancer.analyzers.tonal import extract_tonal_features
+    from audiomancer.analyzers.embeddings import extract_audio_embedding
+    from audiomancer.analyzers.classifier import classify_instrument
+    import librosa
+
+    start_time = time.time()
+
+    # Load config
+    config = load_config()
+
+    # Determine scan paths
+    scan_paths = []
     if path:
-        console.print(f"Would scan: {path}")
-        console.print(f"Recursive: {recursive}")
+        scan_paths = [path]
     else:
-        console.print("Would scan paths from config.yaml")
-    console.print("\n[dim]Coming soon: Audio file indexing with feature extraction[/dim]")
+        # Use configured source paths
+        scan_paths.extend(config.sources.samples.paths)
+        scan_paths.extend(config.sources.synths.paths)
+
+    if not scan_paths:
+        console.print("[yellow]No paths to scan. Specify a path or configure sources in config.yaml[/yellow]")
+        return
+
+    # Find audio files
+    audio_extensions = {'.wav', '.flac', '.mp3', '.ogg', '.aiff', '.aif'}
+    scd_extensions = {'.scd'}
+
+    all_files = []
+    for scan_path in scan_paths:
+        if not scan_path.exists():
+            console.print(f"[yellow]Path does not exist: {scan_path}[/yellow]")
+            continue
+
+        if recursive:
+            for ext in audio_extensions:
+                all_files.extend(scan_path.rglob(f'*{ext}'))
+        else:
+            for ext in audio_extensions:
+                all_files.extend(scan_path.glob(f'*{ext}'))
+
+    if not all_files:
+        console.print(f"[yellow]No audio files found in {len(scan_paths)} path(s)[/yellow]")
+        console.print(f"Scanned: {', '.join(str(p) for p in scan_paths)}")
+        return
+
+    # Initialize stores
+    sample_store = SampleStore(config.storage.db_path)
+    vector_store = LanceDBVectorStore(config.storage.embeddings_path)
+
+    # Scan files with progress bar
+    scanned = 0
+    errors = 0
+    skipped = 0
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task(f"Scanning {len(all_files)} files...", total=len(all_files))
+
+        for file_path in all_files:
+            try:
+                progress.update(task, description=f"Analyzing {file_path.name}...")
+
+                # Extract basic metadata
+                basic = get_basic_metadata(file_path)
+
+                # Check if already in database
+                existing = sample_store.get_by_hash(basic['file_hash'])
+                if existing:
+                    skipped += 1
+                    progress.advance(task)
+                    continue
+
+                # Load audio for feature extraction
+                audio, sr = librosa.load(str(file_path), sr=None, mono=False)
+
+                # Extract features
+                spectral = extract_spectral_features(audio, sr)
+                rhythm = extract_rhythm_features(audio, sr)
+                tonal = extract_tonal_features(audio, sr)
+
+                # Classify instrument
+                classification = classify_instrument(audio, sr)
+
+                # Extract embedding
+                embedding = extract_audio_embedding(file_path)
+
+                # Combine all metadata
+                sample_metadata = {
+                    'file_path': str(file_path.absolute()),
+                    **basic,
+                    **spectral,
+                    **rhythm,
+                    **tonal,
+                    'instrument_type': classification['instrument_type'],
+                    'instrument_confidence': classification['confidence'],
+                    'created_at': datetime.now(),
+                    'updated_at': datetime.now(),
+                }
+
+                # Store sample
+                sample_id = sample_store.add(sample_metadata)
+
+                # Store embedding
+                if embedding is not None:
+                    vector_store.add_embedding(sample_id, embedding)
+
+                scanned += 1
+
+            except Exception as e:
+                errors += 1
+                console.print(f"[red]Error processing {file_path.name}: {e}[/red]")
+
+            progress.advance(task)
+
+    # Print summary
+    elapsed = time.time() - start_time
+    console.print("\n[bold green]Scan complete![/bold green]")
+    console.print(f"Files scanned: {scanned}")
+    console.print(f"Files skipped (already indexed): {skipped}")
+    console.print(f"Errors: {errors}")
+    console.print(f"Time taken: {elapsed:.1f}s")
 
 
 @app.command()
 def search(
     query: str = typer.Argument(..., help="Search query"),
     limit: int = typer.Option(20, help="Maximum results"),
+    bpm_min: Optional[float] = typer.Option(None, "--bpm-min", help="Minimum BPM"),
+    bpm_max: Optional[float] = typer.Option(None, "--bpm-max", help="Maximum BPM"),
+    key: Optional[str] = typer.Option(None, "--key", help="Musical key filter"),
+    instrument: Optional[str] = typer.Option(None, "--instrument", help="Instrument type filter"),
+    mood: Optional[str] = typer.Option(None, "--mood", help="Mood filter"),
 ):
     """Quick search from command line."""
-    console.print("[yellow]Search not yet implemented[/yellow]")
-    console.print(f"Query: {query}")
-    console.print(f"Limit: {limit}")
-    console.print("\n[dim]Coming soon: Semantic audio search[/dim]")
+    from audiomancer.config import load_config
+    from audiomancer.storage.db import SampleStore
+    import os
+
+    # Get database path from env var or config
+    db_path = os.environ.get("AUDIOMANCER_DB_PATH")
+    if not db_path:
+        config = load_config()
+        db_path = str(config.storage.db_path)
+
+    # Initialize store
+    store = SampleStore(db_path)
+
+    # Perform search
+    results = store.search(
+        query=query,
+        instrument_type=instrument,
+        bpm_min=bpm_min,
+        bpm_max=bpm_max,
+        key=key,
+        mood=[mood] if mood else None,
+        limit=limit,
+        offset=0,
+    )
+
+    # Handle empty results
+    if not results:
+        console.print("[yellow]No results found[/yellow]")
+        return
+
+    # Display results in a Rich table
+    table = Table(title=f"Search Results ({len(results)} found)")
+    table.add_column("ID", style="cyan", no_wrap=True)
+    table.add_column("Name", style="green")
+    table.add_column("BPM", style="magenta")
+    table.add_column("Key", style="blue")
+    table.add_column("Instrument", style="yellow")
+    table.add_column("Duration", style="white")
+
+    for sample in results:
+        # Extract filename from path
+        name = Path(sample["file_path"]).name
+
+        # Format BPM
+        bpm_str = f"{sample.get('bpm', 0):.1f}" if sample.get('bpm') else "-"
+
+        # Format key
+        key_str = sample.get('key') or "-"
+
+        # Format instrument
+        instrument_str = sample.get('instrument_type') or "-"
+
+        # Format duration (convert ms to seconds)
+        duration_ms = sample.get('duration_ms', 0)
+        duration_str = f"{duration_ms / 1000:.2f}s"
+
+        table.add_row(
+            sample['id'],
+            name,
+            bpm_str,
+            key_str,
+            instrument_str,
+            duration_str,
+        )
+
+    console.print(table)
 
 
 @app.command()
 def stats():
     """Show library statistics."""
-    console.print("[yellow]Stats not yet implemented[/yellow]")
-    console.print("\n[dim]Coming soon: Library statistics and visualizations[/dim]")
+    from audiomancer.config import load_config
+    from audiomancer.storage.db import SampleStore
+
+    # Load config and database
+    config = load_config()
+    store = SampleStore(config.storage.db_path)
+
+    # Get total count
+    total_samples = store.count()
+
+    # Handle empty database
+    if total_samples == 0:
+        console.print("[yellow]No samples in database[/yellow]")
+        console.print("\n[dim]Run 'audiomancer scan' to analyze audio files[/dim]")
+        return
+
+    # Get distributions
+    instrument_dist = store.get_instrument_distribution()
+    bpm_dist = store.get_bpm_distribution()
+    key_dist = store.get_key_distribution()
+
+    # Display overview panel
+    overview_text = f"[bold]Total Samples:[/bold] {total_samples}"
+    console.print(Panel(overview_text, title="Library Overview", border_style="blue"))
+
+    # Display instrument distribution
+    if instrument_dist:
+        instrument_table = Table(title="Instrument Types", show_header=True, header_style="bold magenta")
+        instrument_table.add_column("Instrument", style="cyan")
+        instrument_table.add_column("Count", justify="right", style="green")
+
+        # Sort by count descending
+        sorted_instruments = sorted(instrument_dist.items(), key=lambda x: x[1], reverse=True)
+        for instrument, count in sorted_instruments:
+            instrument_table.add_row(instrument or "(unknown)", str(count))
+
+        console.print(instrument_table)
+
+    # Display BPM distribution
+    if any(count > 0 for count in bpm_dist.values()):
+        bpm_table = Table(title="BPM Distribution", show_header=True, header_style="bold magenta")
+        bpm_table.add_column("BPM Range", style="cyan")
+        bpm_table.add_column("Count", justify="right", style="green")
+
+        # Display in order
+        bpm_ranges = ['<100', '100-120', '120-140', '140-160', '160+']
+        for bpm_range in bpm_ranges:
+            count = bpm_dist.get(bpm_range, 0)
+            if count > 0:
+                bpm_table.add_row(bpm_range, str(count))
+
+        console.print(bpm_table)
+
+    # Display key distribution
+    if key_dist:
+        key_table = Table(title="Musical Keys", show_header=True, header_style="bold magenta")
+        key_table.add_column("Key", style="cyan")
+        key_table.add_column("Count", justify="right", style="green")
+
+        # Sort by count descending
+        sorted_keys = sorted(key_dist.items(), key=lambda x: x[1], reverse=True)
+        for key, count in sorted_keys:
+            key_table.add_row(key or "(unknown)", str(count))
+
+        console.print(key_table)
 
 
 @app.command()
