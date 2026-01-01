@@ -2,6 +2,8 @@
 
 MCP server for AI-assisted music production. Manages sample libraries, analyzes audio, generates patterns, and integrates with TidalCycles live coding.
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 ## Table of Contents
 
 - [What is audiomancer?](#what-is-audiomancer)
@@ -17,6 +19,9 @@ MCP server for AI-assisted music production. Manages sample libraries, analyzes 
 - [Python API](#python-api)
 - [Project Structure](#project-structure)
 - [Testing](#testing)
+- [Development](#development)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ## What is audiomancer?
 
@@ -435,6 +440,37 @@ embedding = extract_audio_embedding(audio, sr)
 # 128-dim vector for similarity search
 ```
 
+### Similarity Search with FAISS
+
+```python
+from audiomancer.analyzers.embeddings import SimilarityIndex, extract_audio_embedding
+import librosa
+
+# Build an index from multiple samples
+index = SimilarityIndex(dimension=128)
+
+embeddings = []
+for sample_path in sample_paths:
+    audio, sr = librosa.load(sample_path, sr=None)
+    emb = extract_audio_embedding(audio, sr)
+    embeddings.append(emb)
+
+index.add(embeddings)
+print(f"Indexed {index.ntotal} samples")
+
+# Search for similar samples
+query_audio, sr = librosa.load("query.wav", sr=None)
+query_emb = extract_audio_embedding(query_audio, sr)
+
+similarities, indices = index.search(query_emb, k=5)
+for sim, idx in zip(similarities, indices):
+    print(f"Sample {idx}: similarity {sim:.3f}")
+
+# Save/load index for persistence
+index.save("samples.index")
+loaded_index = SimilarityIndex.load("samples.index")
+```
+
 ### Storage & Search
 
 ```python
@@ -477,6 +513,19 @@ pytest tests/unit/            # Fast unit tests
 pytest tests/unit/library/    # Library module tests (62 tests)
 pytest --cov=audiomancer      # With coverage
 ```
+
+## Development
+
+### Setup
+
+After cloning the repo:
+
+```bash
+pip install -e ".[dev]"
+pre-commit install
+```
+
+Run hooks manually: `pre-commit run --all-files`
 
 ## License
 

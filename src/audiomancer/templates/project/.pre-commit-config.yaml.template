@@ -1,0 +1,66 @@
+# Pre-commit hooks for TidalCycles/SuperCollider projects
+# See https://pre-commit.com for more information
+
+repos:
+  # Standard pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+      - id: end-of-file-fixer
+        name: Fix end of files
+      - id: check-yaml
+        name: Check YAML syntax
+        files: '(\.yaml$|\.yml$|\.yaml\.template$|\.yml\.template$)'
+
+  # Markdown formatting
+  - repo: https://github.com/hukkin/mdformat
+    rev: 0.7.21
+    hooks:
+      - id: mdformat
+        name: Format Markdown
+        files: '(\.md$|\.md\.template$)'
+        exclude: 'README\.md$'
+        additional_dependencies:
+          - mdformat-gfm
+          - mdformat-frontmatter
+
+  # YAML linting
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        name: Lint YAML
+        args: [--strict]
+        files: '(\.yaml$|\.yml$|\.yaml\.template$|\.yml\.template$)'
+
+  # Haskell formatting and linting
+  - repo: https://github.com/bwbaugh/haskell-pre-commit-hooks
+    rev: master
+    hooks:
+      - id: stylish-haskell
+        name: Format Haskell
+        files: '(\.hs$|\.tidal$|\.tidal\.template$)'
+      - id: hlint
+        name: Lint Haskell
+        files: '(\.hs$|\.tidal$|\.tidal\.template$)'
+
+  # Local hooks
+  - repo: local
+    hooks:
+      # README TOC generation
+      - id: doctoc
+        name: Generate README TOC
+        entry: npx doctoc@latest --maxlevel 3 --github --notitle
+        language: system
+        files: 'README\.md$'
+        pass_filenames: true
+
+      # SuperCollider linting (optional - skips if sclint not installed)
+      - id: sclint
+        name: SuperCollider Lint (optional)
+        entry: bash -c 'command -v sclint >/dev/null && sclint "$@" || exit 0' --
+        language: system
+        files: '(\.scd$|\.scd\.template$)'
+        pass_filenames: true

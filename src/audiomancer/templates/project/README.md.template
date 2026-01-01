@@ -2,6 +2,8 @@
 
 A TidalCycles live coding project powered by [audiomancer](https://github.com/youruser/audiomancer).
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
@@ -13,6 +15,9 @@ A TidalCycles live coding project powered by [audiomancer](https://github.com/yo
 - [Custom Synths](#custom-synths)
 - [AI Collaboration](#ai-collaboration)
 - [Troubleshooting](#troubleshooting)
+- [Development](#development)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ## Prerequisites
 
@@ -73,7 +78,11 @@ Now the venv activates automatically when you `cd` into the project!
 audiomancer doctor
 ```
 
-This checks that all dependencies are properly installed.
+This checks that all dependencies are properly installed. The doctor shows:
+- **Required** (✓/✗): numpy, librosa, SuperCollider, TidalCycles
+- **Optional** (!): tensorflow, essentia, faiss - for AI audio analysis features
+
+You can use audiomancer without the optional packages - they're only needed for advanced features like audio similarity search and intelligent sample suggestions.
 
 ## Quick Start
 
@@ -366,6 +375,16 @@ This checks all dependencies and shows what's missing.
 - [SuperCollider Documentation](https://doc.sccode.org/)
 - [Audiomancer GitHub](https://github.com/youruser/audiomancer)
 - [TidalCycles Discord](https://discord.gg/ugFq7KP)
+
+## Development
+
+Install git hooks:
+
+```bash
+pre-commit install
+```
+
+Run manually: `pre-commit run --all-files`
 
 ---
 
