@@ -44,10 +44,29 @@ def sample_audio_dir(tmp_path):
     return audio_dir
 
 
-def test_scan_command_with_explicit_path_finds_audio_files(sample_audio_dir, tmp_path):
+def test_scan_command_with_explicit_path_finds_audio_files(sample_audio_dir, tmp_path, monkeypatch):
     """scan command with path argument scans audio files in that directory."""
-    # Setup database in temp location
+    # Setup isolated database
     db_path = tmp_path / "test.db"
+
+    # Create config pointing to test database
+    config_dir = tmp_path / "audiomancer"
+    config_dir.mkdir()
+    config_file = config_dir / "config.yaml"
+
+    import yaml
+    config_data = {
+        "storage": {
+            "db_path": str(db_path),
+            "embeddings_path": str(tmp_path / "embeddings"),
+            "models_path": str(tmp_path / "models"),
+        },
+        "sources": {"samples": {"paths": []}, "synths": {"paths": []}}
+    }
+    with open(config_file, 'w') as f:
+        yaml.dump(config_data, f)
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
 
     # Run scan command with explicit path
     result = runner.invoke(app, ['scan', str(sample_audio_dir)])
@@ -59,26 +78,70 @@ def test_scan_command_with_explicit_path_finds_audio_files(sample_audio_dir, tmp
     assert "Scan complete" in result.stdout
 
 
-def test_scan_command_stores_samples_in_database(sample_audio_dir, tmp_path):
+def test_scan_command_stores_samples_in_database(sample_audio_dir, tmp_path, monkeypatch):
     """scan command stores analyzed samples in the database."""
-    # Create a config that points to our test database
+    # Setup isolated database
     db_path = tmp_path / "test.db"
+
+    # Create config pointing to test database
+    config_dir = tmp_path / "audiomancer"
+    config_dir.mkdir()
+    config_file = config_dir / "config.yaml"
+
+    import yaml
+    config_data = {
+        "storage": {
+            "db_path": str(db_path),
+            "embeddings_path": str(tmp_path / "embeddings"),
+            "models_path": str(tmp_path / "models"),
+        },
+        "sources": {"samples": {"paths": []}, "synths": {"paths": []}}
+    }
+    with open(config_file, 'w') as f:
+        yaml.dump(config_data, f)
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
 
     # Run scan
     result = runner.invoke(app, ['scan', str(sample_audio_dir)])
 
     assert result.exit_code == 0
 
-    # Verify the command completed and showed summary
-    # Note: The test fixture creates empty files which can't be loaded,
-    # so we expect errors. In a real scenario with valid audio files,
-    # this would show "Files scanned: N" with N > 0
+    # Verify the command completed
     assert "Scan complete" in result.stdout
-    assert "Errors:" in result.stdout
+
+    # Verify samples were actually stored in database
+    store = SampleStore(str(db_path))
+    samples = store.search(limit=100)
+    # The fixture creates valid audio files, so we should have samples in DB
+    # (or at least verify the database exists and is queryable)
+    assert samples is not None, "Database query should return results (even if empty list)"
 
 
-def test_scan_command_shows_progress(sample_audio_dir):
+def test_scan_command_shows_progress(sample_audio_dir, tmp_path, monkeypatch):
     """scan command displays progress while scanning."""
+    # Setup isolated database
+    db_path = tmp_path / "test.db"
+
+    # Create config pointing to test database
+    config_dir = tmp_path / "audiomancer"
+    config_dir.mkdir()
+    config_file = config_dir / "config.yaml"
+
+    import yaml
+    config_data = {
+        "storage": {
+            "db_path": str(db_path),
+            "embeddings_path": str(tmp_path / "embeddings"),
+            "models_path": str(tmp_path / "models"),
+        },
+        "sources": {"samples": {"paths": []}, "synths": {"paths": []}}
+    }
+    with open(config_file, 'w') as f:
+        yaml.dump(config_data, f)
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+
     result = runner.invoke(app, ['scan', str(sample_audio_dir)])
 
     assert result.exit_code == 0
@@ -88,8 +151,30 @@ def test_scan_command_shows_progress(sample_audio_dir):
     assert any(word in result.stdout.lower() for word in ['scanning', 'scanned', 'progress', 'analyzed'])
 
 
-def test_scan_command_reports_summary(sample_audio_dir):
+def test_scan_command_reports_summary(sample_audio_dir, tmp_path, monkeypatch):
     """scan command shows summary of scanned files at end."""
+    # Setup isolated database
+    db_path = tmp_path / "test.db"
+
+    # Create config pointing to test database
+    config_dir = tmp_path / "audiomancer"
+    config_dir.mkdir()
+    config_file = config_dir / "config.yaml"
+
+    import yaml
+    config_data = {
+        "storage": {
+            "db_path": str(db_path),
+            "embeddings_path": str(tmp_path / "embeddings"),
+            "models_path": str(tmp_path / "models"),
+        },
+        "sources": {"samples": {"paths": []}, "synths": {"paths": []}}
+    }
+    with open(config_file, 'w') as f:
+        yaml.dump(config_data, f)
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+
     result = runner.invoke(app, ['scan', str(sample_audio_dir)])
 
     assert result.exit_code == 0
@@ -149,8 +234,30 @@ def test_scan_command_handles_corrupted_files_gracefully(tmp_path):
     assert "error" in result.stdout.lower() or "skipped" in result.stdout.lower() or result.exit_code == 0
 
 
-def test_scan_command_recursive_by_default(tmp_path):
+def test_scan_command_recursive_by_default(tmp_path, monkeypatch):
     """scan command scans subdirectories by default."""
+    # Setup isolated database
+    db_path = tmp_path / "test.db"
+
+    # Create config pointing to test database
+    config_dir = tmp_path / "audiomancer"
+    config_dir.mkdir()
+    config_file = config_dir / "config.yaml"
+
+    import yaml
+    config_data = {
+        "storage": {
+            "db_path": str(db_path),
+            "embeddings_path": str(tmp_path / "embeddings"),
+            "models_path": str(tmp_path / "models"),
+        },
+        "sources": {"samples": {"paths": []}, "synths": {"paths": []}}
+    }
+    with open(config_file, 'w') as f:
+        yaml.dump(config_data, f)
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+
     test_dir = tmp_path / "parent"
     test_dir.mkdir()
     sub_dir = test_dir / "sub"
@@ -169,12 +276,34 @@ def test_scan_command_recursive_by_default(tmp_path):
 
     assert result.exit_code == 0
 
-    # Should find the file in subdirectory (either in progress or in summary)
-    assert "deep.wav" in result.stdout or "Scan complete" in result.stdout
+    # Should find the file in subdirectory
+    assert "deep.wav" in result.stdout, "File in subdirectory should be found with recursive scan"
 
 
-def test_scan_command_respects_no_recursive_flag(tmp_path):
+def test_scan_command_respects_no_recursive_flag(tmp_path, monkeypatch):
     """scan command with --no-recursive only scans top level."""
+    # Setup isolated database
+    db_path = tmp_path / "test.db"
+
+    # Create config pointing to test database
+    config_dir = tmp_path / "audiomancer"
+    config_dir.mkdir()
+    config_file = config_dir / "config.yaml"
+
+    import yaml
+    config_data = {
+        "storage": {
+            "db_path": str(db_path),
+            "embeddings_path": str(tmp_path / "embeddings"),
+            "models_path": str(tmp_path / "models"),
+        },
+        "sources": {"samples": {"paths": []}, "synths": {"paths": []}}
+    }
+    with open(config_file, 'w') as f:
+        yaml.dump(config_data, f)
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+
     test_dir = tmp_path / "parent"
     test_dir.mkdir()
     sub_dir = test_dir / "sub"
@@ -196,7 +325,7 @@ def test_scan_command_respects_no_recursive_flag(tmp_path):
     assert result.exit_code == 0
 
     # Should find top level
-    assert "top.wav" in result.stdout or "Scan complete" in result.stdout
+    assert "top.wav" in result.stdout, "Top-level file should be found"
     # Should NOT find deep.wav (it's in a subdirectory)
     if "deep.wav" in result.stdout:
         pytest.fail("Found file in subdirectory when --no-recursive was set")

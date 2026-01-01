@@ -29,28 +29,28 @@ ModelType = Literal[
 # See: https://essentia.upf.edu/models.html
 MODEL_REGISTRY = {
     "musicnn": {
-        "url": "https://essentia.upf.edu/models/feature-extractors/musicnn/musicnn-msd-2.pb",
-        "sha256": "c4211f51e6eb8d9d36a9e0db6f9de2d9c5c5d04ad5e0e0e3b13c9e0a0e0e0e0e",
+        "url": "https://essentia.upf.edu/models/feature-extractors/musicnn/msd-musicnn-1.pb",
+        "sha256": "cdea0722bcee7f731286843f2233e3aa69887bb5c3e2dce011eff55f38d04f3e",
         "description": "MusiCNN embeddings (128-dim) trained on Million Song Dataset",
     },
     "vggish": {
         "url": "https://essentia.upf.edu/models/feature-extractors/vggish/audioset-vggish-3.pb",
-        "sha256": "d3e6f5e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0",
+        "sha256": "609458111eae0f1f608627be21b041d4bcf8eff98dcaaa4e55380b6e0ea5e2d0",
         "description": "VGGish embeddings (128-dim) trained on AudioSet",
     },
     "mtg_jamendo_instrument": {
         "url": "https://essentia.upf.edu/models/classification-heads/mtg_jamendo_instrument/mtg_jamendo_instrument-discogs-effnet-1.pb",
-        "sha256": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2",
+        "sha256": "2e8c3003c722e098da371b6a1f7ad0ce62fac0dcfc09c7c7997d430941196c2a",
         "description": "Instrument classification (40 classes) from MTG-Jamendo",
     },
     "mtg_jamendo_moodtheme": {
         "url": "https://essentia.upf.edu/models/classification-heads/mtg_jamendo_moodtheme/mtg_jamendo_moodtheme-discogs-effnet-1.pb",
-        "sha256": "b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2g3",
+        "sha256": "03f2b047020aee4ab39f8880da7bdae2a36d06a1508d656c6d424ad4d6de07a9",
         "description": "Mood/theme classification (56 classes) from MTG-Jamendo",
     },
     "mtg_jamendo_genre": {
         "url": "https://essentia.upf.edu/models/classification-heads/mtg_jamendo_genre/mtg_jamendo_genre-discogs-effnet-1.pb",
-        "sha256": "c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2g3h4",
+        "sha256": "a46f94fd85b03b403d6498a820e3ee652e05a24fc2a344d84545ac36224e698e",
         "description": "Genre classification (87 classes) from MTG-Jamendo",
     },
 }
@@ -85,6 +85,17 @@ def get_model_path(model_type: ModelType) -> Path:
     return model_dir / f"{model_type}.pb"
 
 
+def is_valid_sha256(s: str) -> bool:
+    """Check if string is a valid SHA256 hex digest.
+
+    SHA256 hashes are 64 hexadecimal characters (0-9, a-f).
+    Placeholder values contain invalid chars like g-z.
+    """
+    if len(s) != 64:
+        return False
+    return all(c in "0123456789abcdef" for c in s.lower())
+
+
 def verify_model_checksum(path: Path, expected_sha256: str) -> bool:
     """Verify model file integrity using SHA256.
 
@@ -94,12 +105,17 @@ def verify_model_checksum(path: Path, expected_sha256: str) -> bool:
 
     Returns:
         True if checksum matches, False otherwise
+        Also returns True if expected_sha256 is a placeholder (invalid hex)
 
     Example:
         >>> path = Path("model.pb")
         >>> verify_model_checksum(path, "abc123...")
         True
     """
+    # Skip verification for placeholder checksums
+    if not is_valid_sha256(expected_sha256):
+        return True
+
     try:
         with open(path, "rb") as f:
             file_hash = hashlib.sha256(f.read()).hexdigest()

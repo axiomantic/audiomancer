@@ -100,8 +100,9 @@ def test_search_command_with_text_query_finds_matching_samples(populated_db, tmp
     result = runner.invoke(app, ['search', '808'])
 
     assert result.exit_code == 0
-    assert "kick_808_1" in result.stdout or "808" in result.stdout
-    assert "kick_808_2" in result.stdout or "808" in result.stdout
+    # Verify both 808 samples are found
+    assert "kick_808_1" in result.stdout, "First 808 kick should be in results"
+    assert "kick_808_2" in result.stdout, "Second 808 kick should be in results"
 
 
 def test_search_command_displays_results_in_table(populated_db, monkeypatch):
@@ -122,9 +123,13 @@ def test_search_command_filters_by_bpm_range(populated_db, monkeypatch):
     result = runner.invoke(app, ['search', 'samples', '--bpm-min', '125', '--bpm-max', '135'])
 
     assert result.exit_code == 0
-    # Should find hihat (125 BPM) and snare (130 BPM)
-    # Should NOT find kick_808_1 (120 BPM) or kick_808_2 (140 BPM)
-    assert "hihat" in result.stdout or "snare" in result.stdout
+    # Verify INCLUSIONS: Should find hihat (125 BPM) and snare (130 BPM)
+    assert "hihat_909" in result.stdout, "Expected hihat (125 BPM) in results"
+    assert "snare_acoustic" in result.stdout, "Expected snare (130 BPM) in results"
+
+    # Verify EXCLUSIONS: Should NOT find kick_808_1 (120 BPM) or kick_808_2 (140 BPM)
+    assert "kick_808_1" not in result.stdout, "120 BPM kick should be excluded by --bpm-min 125"
+    assert "kick_808_2" not in result.stdout, "140 BPM kick should be excluded by --bpm-max 135"
 
 
 def test_search_command_filters_by_key(populated_db, monkeypatch):
@@ -134,8 +139,13 @@ def test_search_command_filters_by_key(populated_db, monkeypatch):
     result = runner.invoke(app, ['search', 'samples', '--key', 'C'])
 
     assert result.exit_code == 0
-    # Should find both kick_808 samples (both in C)
-    assert "kick" in result.stdout.lower()
+    # Verify INCLUSIONS: Should find both kick_808 samples (both in C)
+    assert "kick_808_1" in result.stdout, "Kick 808_1 (key C) should be included"
+    assert "kick_808_2" in result.stdout, "Kick 808_2 (key C) should be included"
+
+    # Verify EXCLUSIONS: Should NOT find samples in other keys
+    assert "snare_acoustic" not in result.stdout, "Snare (key D) should be excluded"
+    assert "bass_synth" not in result.stdout, "Bass (key A) should be excluded"
 
 
 def test_search_command_filters_by_instrument_type(populated_db, monkeypatch):
@@ -145,7 +155,13 @@ def test_search_command_filters_by_instrument_type(populated_db, monkeypatch):
     result = runner.invoke(app, ['search', 'samples', '--instrument', 'bass'])
 
     assert result.exit_code == 0
-    assert "bass" in result.stdout.lower()
+    # Verify INCLUSIONS: Should find bass sample
+    assert "bass_synth" in result.stdout, "Bass sample should be included"
+
+    # Verify EXCLUSIONS: Should NOT find non-bass instruments
+    assert "kick" not in result.stdout, "Kick samples should be excluded"
+    assert "snare" not in result.stdout, "Snare sample should be excluded"
+    assert "hihat" not in result.stdout, "Hihat sample should be excluded"
 
 
 def test_search_command_respects_limit_option(populated_db, monkeypatch):
@@ -156,9 +172,10 @@ def test_search_command_respects_limit_option(populated_db, monkeypatch):
 
     assert result.exit_code == 0
     # Should return at most 2 results
-    # Count rows in output (this is approximate, depends on table format)
-    lines = [line for line in result.stdout.split('\n') if line.strip()]
-    # With headers and borders, we expect limited results
+    # Count how many sample IDs appear in the output
+    sample_ids = ['kick_808_1', 'kick_808_2', 'snare_acoustic_1', 'hihat_909_1', 'bass_synth_1']
+    found_count = sum(1 for sid in sample_ids if sid in result.stdout)
+    assert found_count <= 2, f"Expected at most 2 samples with --limit 2, found {found_count}"
 
 
 def test_search_command_handles_no_results_gracefully(populated_db, monkeypatch):
@@ -184,8 +201,15 @@ def test_search_command_combines_multiple_filters(populated_db, monkeypatch):
     ])
 
     assert result.exit_code == 0
-    # Should find kick_808_1 (120 BPM, kick, C key, path contains "808")
-    assert "kick_808_1" in result.stdout or "120" in result.stdout
+    # Verify INCLUSION: Should find kick_808_1 (120 BPM, kick, C key, path contains "808")
+    assert "kick_808_1" in result.stdout, "kick_808_1 matches all filters"
+
+    # Verify EXCLUSIONS: kick_808_2 fails BPM filter (140 > 125)
+    assert "kick_808_2" not in result.stdout, "kick_808_2 should be excluded by BPM max"
+    # Other samples fail multiple filters
+    assert "snare" not in result.stdout, "Snare should be excluded (wrong instrument)"
+    assert "bass" not in result.stdout, "Bass should be excluded (wrong instrument)"
+    assert "hihat" not in result.stdout, "Hihat should be excluded (wrong instrument)"
 
 
 def test_search_command_shows_sample_duration(populated_db, monkeypatch):
