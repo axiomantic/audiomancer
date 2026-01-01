@@ -67,6 +67,9 @@ def classify_instrument(
     """Classify audio into instrument categories using Essentia's pre-trained models.
 
     Uses MTG-Jamendo instrument classification model to detect instrument presence.
+    This requires a two-stage pipeline:
+    1. Extract embeddings using discogs-effnet base model
+    2. Pass embeddings to classification head
 
     Args:
         audio: Audio samples as numpy array (mono or stereo)
@@ -94,11 +97,6 @@ def classify_instrument(
         [('drums', 0.92), ('percussion', 0.78), ('beat', 0.45)]
     """
     try:
-        # Load model
-        if model_path is None:
-            model_path_obj = load_model("mtg_jamendo_instrument")
-            model_path = str(model_path_obj)
-
         # Ensure mono audio
         if audio.ndim > 1:
             audio = np.mean(audio, axis=0)
@@ -108,23 +106,38 @@ def classify_instrument(
             import librosa
             audio = librosa.resample(audio, orig_sr=sr, target_sr=16000)
 
-        # Extract predictions using TensorflowPredictEffnetDiscogs
-        model = es.TensorflowPredictEffnetDiscogs(
-            graphFilename=model_path,
+        # Stage 1: Extract embeddings using discogs-effnet base model
+        effnet_path = str(load_model("discogs_effnet"))
+        effnet = es.TensorflowPredictEffnetDiscogs(
+            graphFilename=effnet_path,
             output="PartitionedCall:1",
         )
+        embeddings = effnet(audio)
 
-        # Get predictions (2D array: [num_patches, num_classes])
-        predictions_2d = model(audio)
+        # Convert to numpy array if needed
+        if not isinstance(embeddings, np.ndarray):
+            embeddings = np.array(embeddings)
 
-        # Average across time to get single prediction per class
-        if predictions_2d.ndim == 2:
-            predictions_1d = np.mean(predictions_2d, axis=0)
-        else:
-            predictions_1d = predictions_2d
+        # Average embeddings across patches
+        if embeddings.ndim == 2:
+            embeddings = np.mean(embeddings, axis=0)
 
-        # Apply softmax to get probabilities
-        predictions = np.exp(predictions_1d) / np.sum(np.exp(predictions_1d))
+        # Reshape to 2D for TensorflowPredict2D (expects [batch_size, features])
+        embeddings_2d = embeddings.reshape(1, -1).astype(np.float32)
+
+        # Stage 2: Pass embeddings to classification head
+        if model_path is None:
+            model_path = str(load_model("mtg_jamendo_instrument"))
+
+        classifier = es.TensorflowPredict2D(
+            graphFilename=model_path,
+            input="model/Placeholder",
+            output="model/Sigmoid",
+        )
+        predictions_2d = classifier(embeddings_2d)
+
+        # Extract first (and only) batch element
+        predictions = predictions_2d[0]
 
         # Get top-k predictions
         top_indices = np.argsort(predictions)[-top_k:][::-1]
@@ -165,6 +178,9 @@ def extract_mood_tags(
     """Extract mood/theme tags using Essentia's mood classifiers.
 
     Uses MTG-Jamendo mood/theme classification model.
+    This requires a two-stage pipeline:
+    1. Extract embeddings using discogs-effnet base model
+    2. Pass embeddings to classification head
 
     Args:
         audio: Audio samples as numpy array (mono or stereo)
@@ -185,10 +201,6 @@ def extract_mood_tags(
         ['dark', 'electronic', 'energetic']
     """
     try:
-        # Load model
-        model_path_obj = load_model("mtg_jamendo_moodtheme")
-        model_path = str(model_path_obj)
-
         # Ensure mono audio
         if audio.ndim > 1:
             audio = np.mean(audio, axis=0)
@@ -198,23 +210,36 @@ def extract_mood_tags(
             import librosa
             audio = librosa.resample(audio, orig_sr=sr, target_sr=16000)
 
-        # Extract predictions
-        model = es.TensorflowPredictEffnetDiscogs(
-            graphFilename=model_path,
+        # Stage 1: Extract embeddings using discogs-effnet base model
+        effnet_path = str(load_model("discogs_effnet"))
+        effnet = es.TensorflowPredictEffnetDiscogs(
+            graphFilename=effnet_path,
             output="PartitionedCall:1",
         )
+        embeddings = effnet(audio)
 
-        # Get predictions (2D array: [num_patches, num_classes])
-        predictions_2d = model(audio)
+        # Convert to numpy array if needed
+        if not isinstance(embeddings, np.ndarray):
+            embeddings = np.array(embeddings)
 
-        # Average across time to get single prediction per class
-        if predictions_2d.ndim == 2:
-            predictions_1d = np.mean(predictions_2d, axis=0)
-        else:
-            predictions_1d = predictions_2d
+        # Average embeddings across patches
+        if embeddings.ndim == 2:
+            embeddings = np.mean(embeddings, axis=0)
 
-        # Apply softmax to get probabilities
-        predictions = np.exp(predictions_1d) / np.sum(np.exp(predictions_1d))
+        # Reshape to 2D for TensorflowPredict2D (expects [batch_size, features])
+        embeddings_2d = embeddings.reshape(1, -1).astype(np.float32)
+
+        # Stage 2: Pass embeddings to classification head
+        model_path = str(load_model("mtg_jamendo_moodtheme"))
+        classifier = es.TensorflowPredict2D(
+            graphFilename=model_path,
+            input="model/Placeholder",
+            output="model/Sigmoid",
+        )
+        predictions_2d = classifier(embeddings_2d)
+
+        # Extract first (and only) batch element
+        predictions = predictions_2d[0]
 
         # Filter by threshold and get top-k
         filtered_indices = np.where(predictions >= threshold)[0]
@@ -250,6 +275,9 @@ def extract_genre_tags(
     """Extract genre tags using Essentia's genre classifiers.
 
     Uses MTG-Jamendo genre classification model.
+    This requires a two-stage pipeline:
+    1. Extract embeddings using discogs-effnet base model
+    2. Pass embeddings to classification head
 
     Args:
         audio: Audio samples as numpy array (mono or stereo)
@@ -270,10 +298,6 @@ def extract_genre_tags(
         ['techno', 'electronic', 'house']
     """
     try:
-        # Load model
-        model_path_obj = load_model("mtg_jamendo_genre")
-        model_path = str(model_path_obj)
-
         # Ensure mono audio
         if audio.ndim > 1:
             audio = np.mean(audio, axis=0)
@@ -283,23 +307,36 @@ def extract_genre_tags(
             import librosa
             audio = librosa.resample(audio, orig_sr=sr, target_sr=16000)
 
-        # Extract predictions
-        model = es.TensorflowPredictEffnetDiscogs(
-            graphFilename=model_path,
+        # Stage 1: Extract embeddings using discogs-effnet base model
+        effnet_path = str(load_model("discogs_effnet"))
+        effnet = es.TensorflowPredictEffnetDiscogs(
+            graphFilename=effnet_path,
             output="PartitionedCall:1",
         )
+        embeddings = effnet(audio)
 
-        # Get predictions (2D array: [num_patches, num_classes])
-        predictions_2d = model(audio)
+        # Convert to numpy array if needed
+        if not isinstance(embeddings, np.ndarray):
+            embeddings = np.array(embeddings)
 
-        # Average across time to get single prediction per class
-        if predictions_2d.ndim == 2:
-            predictions_1d = np.mean(predictions_2d, axis=0)
-        else:
-            predictions_1d = predictions_2d
+        # Average embeddings across patches
+        if embeddings.ndim == 2:
+            embeddings = np.mean(embeddings, axis=0)
 
-        # Apply softmax to get probabilities
-        predictions = np.exp(predictions_1d) / np.sum(np.exp(predictions_1d))
+        # Reshape to 2D for TensorflowPredict2D (expects [batch_size, features])
+        embeddings_2d = embeddings.reshape(1, -1).astype(np.float32)
+
+        # Stage 2: Pass embeddings to classification head
+        model_path = str(load_model("mtg_jamendo_genre"))
+        classifier = es.TensorflowPredict2D(
+            graphFilename=model_path,
+            input="model/Placeholder",
+            output="model/Sigmoid",
+        )
+        predictions_2d = classifier(embeddings_2d)
+
+        # Extract first (and only) batch element
+        predictions = predictions_2d[0]
 
         # Filter by threshold and get top-k
         filtered_indices = np.where(predictions >= threshold)[0]

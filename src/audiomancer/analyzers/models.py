@@ -19,6 +19,7 @@ ModelType = Literal[
     "musicnn",
     "vggish",
     "openl3",
+    "discogs_effnet",
     "mtg_jamendo_instrument",
     "mtg_jamendo_moodtheme",
     "mtg_jamendo_genre",
@@ -37,6 +38,11 @@ MODEL_REGISTRY = {
         "url": "https://essentia.upf.edu/models/feature-extractors/vggish/audioset-vggish-3.pb",
         "sha256": "609458111eae0f1f608627be21b041d4bcf8eff98dcaaa4e55380b6e0ea5e2d0",
         "description": "VGGish embeddings (128-dim) trained on AudioSet",
+    },
+    "discogs_effnet": {
+        "url": "https://essentia.upf.edu/models/feature-extractors/discogs-effnet/discogs-effnet-bs64-1.pb",
+        "sha256": "3ed9af50d5367c0b9c795b294b00e7599e4943244f4cbd376869f3bfc87721b1",
+        "description": "Discogs-EffNet embeddings (1280-dim) base model for classification heads",
     },
     "mtg_jamendo_instrument": {
         "url": "https://essentia.upf.edu/models/classification-heads/mtg_jamendo_instrument/mtg_jamendo_instrument-discogs-effnet-1.pb",

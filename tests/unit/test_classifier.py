@@ -18,23 +18,33 @@ class TestInstrumentClassification:
     """Test instrument classification."""
 
     @patch("audiomancer.analyzers.classifier.load_model")
+    @patch("audiomancer.analyzers.classifier.es.TensorflowPredict2D")
     @patch("audiomancer.analyzers.classifier.es.TensorflowPredictEffnetDiscogs")
-    def test_classify_instrument_success(self, mock_model_class, mock_load, tmp_path):
+    def test_classify_instrument_success(
+        self, mock_effnet_class, mock_classifier_class, mock_load, tmp_path
+    ):
         """Test successful instrument classification."""
         # Mock model loading
-        model_path = tmp_path / "instrument.pb"
-        model_path.write_bytes(b"model")
-        mock_load.return_value = model_path
+        effnet_path = tmp_path / "discogs_effnet.pb"
+        effnet_path.write_bytes(b"effnet")
+        instrument_path = tmp_path / "instrument.pb"
+        instrument_path.write_bytes(b"model")
+        mock_load.side_effect = [effnet_path, instrument_path]
 
-        # Mock model predictions
-        mock_model = MagicMock()
-        # Create fake predictions (40 classes, drums highest)
-        predictions = np.zeros(40, dtype=np.float32)
-        predictions[13] = 5.0  # drums (index 13)
-        predictions[14] = 3.0  # drummachine
-        predictions[27] = 2.0  # percussion
-        mock_model.return_value = predictions
-        mock_model_class.return_value = mock_model
+        # Mock embedding extractor (returns 2D embeddings)
+        mock_effnet = MagicMock()
+        embeddings = np.random.rand(3, 1280).astype(np.float32)
+        mock_effnet.return_value = embeddings
+        mock_effnet_class.return_value = mock_effnet
+
+        # Mock classifier (returns 2D predictions)
+        mock_classifier = MagicMock()
+        predictions_batch = np.zeros((1, 40), dtype=np.float32)
+        predictions_batch[0, 13] = 0.8  # drums
+        predictions_batch[0, 14] = 0.6  # drummachine
+        predictions_batch[0, 27] = 0.4  # percussion
+        mock_classifier.return_value = predictions_batch
+        mock_classifier_class.return_value = mock_classifier
 
         # Create test audio
         audio = create_test_audio(duration=1.0, sample_rate=44100, frequency=440)
@@ -75,19 +85,31 @@ class TestInstrumentClassification:
             classify_instrument(audio, 44100)
 
     @patch("audiomancer.analyzers.classifier.load_model")
+    @patch("audiomancer.analyzers.classifier.es.TensorflowPredict2D")
     @patch("audiomancer.analyzers.classifier.es.TensorflowPredictEffnetDiscogs")
-    def test_classify_instrument_stereo_to_mono(self, mock_model_class, mock_load, tmp_path):
+    def test_classify_instrument_stereo_to_mono(
+        self, mock_effnet_class, mock_classifier_class, mock_load, tmp_path
+    ):
         """Test that stereo audio is converted to mono."""
-        # Mock model
-        model_path = tmp_path / "instrument.pb"
-        model_path.write_bytes(b"model")
-        mock_load.return_value = model_path
+        # Mock model loading
+        effnet_path = tmp_path / "discogs_effnet.pb"
+        effnet_path.write_bytes(b"effnet")
+        instrument_path = tmp_path / "instrument.pb"
+        instrument_path.write_bytes(b"model")
+        mock_load.side_effect = [effnet_path, instrument_path]
 
-        mock_model = MagicMock()
-        predictions = np.zeros(40, dtype=np.float32)
-        predictions[0] = 5.0
-        mock_model.return_value = predictions
-        mock_model_class.return_value = mock_model
+        # Mock embedding extractor
+        mock_effnet = MagicMock()
+        embeddings = np.random.rand(3, 1280).astype(np.float32)
+        mock_effnet.return_value = embeddings
+        mock_effnet_class.return_value = mock_effnet
+
+        # Mock classifier
+        mock_classifier = MagicMock()
+        predictions_batch = np.zeros((1, 40), dtype=np.float32)
+        predictions_batch[0, 0] = 0.9
+        mock_classifier.return_value = predictions_batch
+        mock_classifier_class.return_value = mock_classifier
 
         # Create stereo audio
         mono = create_test_audio(duration=0.5, sample_rate=44100)
@@ -100,19 +122,31 @@ class TestInstrumentClassification:
         assert result["instrument_type"] in INSTRUMENT_CLASSES
 
     @patch("audiomancer.analyzers.classifier.load_model")
+    @patch("audiomancer.analyzers.classifier.es.TensorflowPredict2D")
     @patch("audiomancer.analyzers.classifier.es.TensorflowPredictEffnetDiscogs")
-    def test_classify_instrument_resampling(self, mock_model_class, mock_load, tmp_path):
+    def test_classify_instrument_resampling(
+        self, mock_effnet_class, mock_classifier_class, mock_load, tmp_path
+    ):
         """Test that audio is resampled to 16kHz."""
-        # Mock model
-        model_path = tmp_path / "instrument.pb"
-        model_path.write_bytes(b"model")
-        mock_load.return_value = model_path
+        # Mock model loading
+        effnet_path = tmp_path / "discogs_effnet.pb"
+        effnet_path.write_bytes(b"effnet")
+        instrument_path = tmp_path / "instrument.pb"
+        instrument_path.write_bytes(b"model")
+        mock_load.side_effect = [effnet_path, instrument_path]
 
-        mock_model = MagicMock()
-        predictions = np.zeros(40, dtype=np.float32)
-        predictions[0] = 5.0
-        mock_model.return_value = predictions
-        mock_model_class.return_value = mock_model
+        # Mock embedding extractor
+        mock_effnet = MagicMock()
+        embeddings = np.random.rand(3, 1280).astype(np.float32)
+        mock_effnet.return_value = embeddings
+        mock_effnet_class.return_value = mock_effnet
+
+        # Mock classifier
+        mock_classifier = MagicMock()
+        predictions_batch = np.zeros((1, 40), dtype=np.float32)
+        predictions_batch[0, 0] = 0.9
+        mock_classifier.return_value = predictions_batch
+        mock_classifier_class.return_value = mock_classifier
 
         # Create 48kHz audio
         audio = create_test_audio(duration=0.5, sample_rate=48000)
@@ -128,22 +162,33 @@ class TestMoodClassification:
     """Test mood/theme classification."""
 
     @patch("audiomancer.analyzers.classifier.load_model")
+    @patch("audiomancer.analyzers.classifier.es.TensorflowPredict2D")
     @patch("audiomancer.analyzers.classifier.es.TensorflowPredictEffnetDiscogs")
-    def test_extract_mood_tags_success(self, mock_model_class, mock_load, tmp_path):
+    def test_extract_mood_tags_success(
+        self, mock_effnet_class, mock_classifier_class, mock_load, tmp_path
+    ):
         """Test successful mood extraction."""
         # Mock model loading
-        model_path = tmp_path / "mood.pb"
-        model_path.write_bytes(b"model")
-        mock_load.return_value = model_path
+        effnet_path = tmp_path / "discogs_effnet.pb"
+        effnet_path.write_bytes(b"effnet")
+        mood_path = tmp_path / "mood.pb"
+        mood_path.write_bytes(b"model")
+        mock_load.side_effect = [effnet_path, mood_path]
 
-        # Mock predictions (56 mood classes)
-        mock_model = MagicMock()
-        predictions = np.zeros(56, dtype=np.float32)
-        predictions[11] = 5.0  # dark
-        predictions[30] = 4.0  # energetic
-        predictions[39] = 3.0  # powerful
-        mock_model.return_value = predictions
-        mock_model_class.return_value = mock_model
+        # Mock embedding extractor
+        mock_effnet = MagicMock()
+        embeddings = np.random.rand(3, 1280).astype(np.float32)
+        mock_effnet.return_value = embeddings
+        mock_effnet_class.return_value = mock_effnet
+
+        # Mock classifier (56 mood classes)
+        mock_classifier = MagicMock()
+        predictions_batch = np.zeros((1, 56), dtype=np.float32)
+        predictions_batch[0, 11] = 0.8  # dark
+        predictions_batch[0, 18] = 0.6  # energetic
+        predictions_batch[0, 41] = 0.4  # powerful
+        mock_classifier.return_value = predictions_batch
+        mock_classifier_class.return_value = mock_classifier
 
         # Create test audio
         audio = create_test_audio(duration=1.0, sample_rate=44100)
@@ -158,27 +203,38 @@ class TestMoodClassification:
             assert mood in MOOD_CLASSES
 
     @patch("audiomancer.analyzers.classifier.load_model")
+    @patch("audiomancer.analyzers.classifier.es.TensorflowPredict2D")
     @patch("audiomancer.analyzers.classifier.es.TensorflowPredictEffnetDiscogs")
-    def test_extract_mood_tags_threshold_filtering(self, mock_model_class, mock_load, tmp_path):
+    def test_extract_mood_tags_threshold_filtering(
+        self, mock_effnet_class, mock_classifier_class, mock_load, tmp_path
+    ):
         """Test that threshold filters low-confidence predictions."""
-        # Mock model
-        model_path = tmp_path / "mood.pb"
-        model_path.write_bytes(b"model")
-        mock_load.return_value = model_path
+        # Mock model loading
+        effnet_path = tmp_path / "discogs_effnet.pb"
+        effnet_path.write_bytes(b"effnet")
+        mood_path = tmp_path / "mood.pb"
+        mood_path.write_bytes(b"model")
+        mock_load.side_effect = [effnet_path, mood_path]
 
-        mock_model = MagicMock()
-        # Create predictions with only one above threshold
-        predictions = np.ones(56, dtype=np.float32) * 0.01  # All very low
-        predictions[11] = 5.0  # Only this one high
-        mock_model.return_value = predictions
-        mock_model_class.return_value = mock_model
+        # Mock embedding extractor
+        mock_effnet = MagicMock()
+        embeddings = np.random.rand(3, 1280).astype(np.float32)
+        mock_effnet.return_value = embeddings
+        mock_effnet_class.return_value = mock_effnet
+
+        # Mock classifier with one high prediction
+        mock_classifier = MagicMock()
+        predictions_batch = np.ones((1, 56), dtype=np.float32) * 0.01
+        predictions_batch[0, 11] = 0.9  # Only this one high
+        mock_classifier.return_value = predictions_batch
+        mock_classifier_class.return_value = mock_classifier
 
         audio = create_test_audio(duration=1.0)
 
         # Extract with high threshold
         moods = extract_mood_tags(audio, 44100, top_k=10, threshold=0.5)
 
-        # Should only get the one above threshold after softmax
+        # Should only get the one above threshold
         assert len(moods) >= 1
         assert all(m in MOOD_CLASSES for m in moods)
 
@@ -187,22 +243,34 @@ class TestGenreClassification:
     """Test genre classification."""
 
     @patch("audiomancer.analyzers.classifier.load_model")
+    @patch("audiomancer.analyzers.classifier.es.TensorflowPredict2D")
     @patch("audiomancer.analyzers.classifier.es.TensorflowPredictEffnetDiscogs")
-    def test_extract_genre_tags_success(self, mock_model_class, mock_load, tmp_path):
+    def test_extract_genre_tags_success(
+        self, mock_effnet_class, mock_classifier_class, mock_load, tmp_path
+    ):
         """Test successful genre extraction."""
         # Mock model loading
-        model_path = tmp_path / "genre.pb"
-        model_path.write_bytes(b"model")
-        mock_load.return_value = model_path
+        effnet_path = tmp_path / "discogs_effnet.pb"
+        effnet_path.write_bytes(b"effnet")
+        genre_path = tmp_path / "genre.pb"
+        genre_path.write_bytes(b"model")
+        mock_load.side_effect = [effnet_path, genre_path]
 
-        # Mock predictions (87 genre classes)
-        mock_model = MagicMock()
-        predictions = np.zeros(87, dtype=np.float32)
-        predictions[68] = 5.0  # techno
-        predictions[35] = 4.0  # electronic
-        predictions[40] = 3.0  # house
-        mock_model.return_value = predictions
-        mock_model_class.return_value = mock_model
+        # Mock embedding extractor
+        mock_effnet = MagicMock()
+        embeddings = np.random.rand(3, 1280).astype(np.float32)
+        mock_effnet.return_value = embeddings
+        mock_effnet_class.return_value = mock_effnet
+
+        # Mock classifier (87 genre classes)
+        mock_classifier = MagicMock()
+        # Note: GENRE_CLASSES has 86 items, not 87 (test was wrong)
+        predictions_batch = np.zeros((1, 86), dtype=np.float32)
+        predictions_batch[0, 68] = 0.8  # techno
+        predictions_batch[0, 35] = 0.6  # electronic
+        predictions_batch[0, 40] = 0.4  # house
+        mock_classifier.return_value = predictions_batch
+        mock_classifier_class.return_value = mock_classifier
 
         # Create test audio
         audio = create_test_audio(duration=1.0, sample_rate=44100)
@@ -229,19 +297,30 @@ class TestGenreClassification:
             extract_genre_tags(audio, 44100)
 
     @patch("audiomancer.analyzers.classifier.load_model")
+    @patch("audiomancer.analyzers.classifier.es.TensorflowPredict2D")
     @patch("audiomancer.analyzers.classifier.es.TensorflowPredictEffnetDiscogs")
-    def test_extract_genre_tags_empty_result(self, mock_model_class, mock_load, tmp_path):
+    def test_extract_genre_tags_empty_result(
+        self, mock_effnet_class, mock_classifier_class, mock_load, tmp_path
+    ):
         """Test genre extraction when all predictions below threshold."""
-        # Mock model
-        model_path = tmp_path / "genre.pb"
-        model_path.write_bytes(b"model")
-        mock_load.return_value = model_path
+        # Mock model loading
+        effnet_path = tmp_path / "discogs_effnet.pb"
+        effnet_path.write_bytes(b"effnet")
+        genre_path = tmp_path / "genre.pb"
+        genre_path.write_bytes(b"model")
+        mock_load.side_effect = [effnet_path, genre_path]
 
-        mock_model = MagicMock()
-        # All predictions very low
-        predictions = np.ones(87, dtype=np.float32) * 0.001
-        mock_model.return_value = predictions
-        mock_model_class.return_value = mock_model
+        # Mock embedding extractor
+        mock_effnet = MagicMock()
+        embeddings = np.random.rand(3, 1280).astype(np.float32)
+        mock_effnet.return_value = embeddings
+        mock_effnet_class.return_value = mock_effnet
+
+        # Mock classifier with all low predictions
+        mock_classifier = MagicMock()
+        predictions_batch = np.ones((1, 86), dtype=np.float32) * 0.001
+        mock_classifier.return_value = predictions_batch
+        mock_classifier_class.return_value = mock_classifier
 
         audio = create_test_audio(duration=1.0)
 
