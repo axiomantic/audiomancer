@@ -7,12 +7,6 @@ license = {text = "MIT"}
 authors = [{name = "Elijah Rutschman", email = "elijahr@users.noreply.github.com"}]
 readme = "README.md"
 
-[project.urls]
-Homepage = "https://github.com/axiomantic/audiomancer"
-Documentation = "https://axiomantic.github.io/audiomancer"
-Repository = "https://github.com/axiomantic/audiomancer"
-Issues = "https://github.com/axiomantic/audiomancer/issues"
-
 dependencies = [
     # MCP
     "mcp>=1.25.0",
@@ -40,6 +34,12 @@ dependencies = [
     "typer>=0.21.0",
     "rich>=14.0.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/axiomantic/audiomancer"
+Documentation = "https://axiomantic.github.io/audiomancer"
+Repository = "https://github.com/axiomantic/audiomancer"
+Issues = "https://github.com/axiomantic/audiomancer/issues"
 
 [project.optional-dependencies]
 dev = [
