@@ -1,0 +1,23 @@
+/* SVG theme support for architecture diagram */
+
+/* Light mode - dark text for readability */
+[data-md-color-scheme="default"] .md-content svg text {
+  fill: #333;
+}
+
+/* Dark mode - light text for readability */
+[data-md-color-scheme="slate"] .md-content svg text {
+  fill: #ddd;
+}
+
+/* Ensure edge labels are visible in dark mode */
+[data-md-color-scheme="slate"] .md-content svg .edge text,
+[data-md-color-scheme="slate"] .md-content svg text[font-size="9.00"] {
+  fill: #e0e0e0;
+}
+
+/* Keep node fills and strokes as-is, only adjust text */
+[data-md-color-scheme="slate"] .md-content svg path,
+[data-md-color-scheme="slate"] .md-content svg polygon {
+  /* Preserve original colors for shapes */
+}
