@@ -56,3 +56,7 @@ logs/
 
 # macOS
 .DS_Store
+
+# MkDocs build artifacts
+site/
+.mkdocs_cache/

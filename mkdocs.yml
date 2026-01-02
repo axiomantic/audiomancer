@@ -1,0 +1,87 @@
+site_name: Audiomancer Documentation
+site_description: MCP server for AI-assisted music production
+site_url: https://axiomantic.github.io/audiomancer/
+repo_url: https://github.com/axiomantic/audiomancer
+repo_name: axiomantic/audiomancer
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  palette:
+    - scheme: default
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_signature_annotations: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Setup: getting-started/setup.md
+      - Quick Start: getting-started/quickstart.md
+  - User Guide:
+      - Workflows: guide/workflows.md
+      - MCP Tools: guide/mcp-tools.md
+      - CLI Commands: guide/cli.md
+  - Configuration:
+      - Configuration System: configuration/system.md
+      - Examples: configuration/examples.md
+  - API Reference:
+      - Overview: api/index.md
+      - Analyzers: api/analyzers.md
+      - Converters: api/converters.md
+      - Generators: api/generators.md
+      - Library: api/library.md
+      - Storage: api/storage.md
+      - Templates: api/templates.md
+  - Technical Documentation:
+      - Architecture: technical/architecture.md
+      - MCP Server: technical/mcp-server.md
+      - Pattern Generation: technical/pattern-generation.md
+      - Storage Implementation: technical/storage.md
+      - Analyzers: technical/analyzers.md
+      - Rhythm & Tonal Analysis: technical/rhythm-tonal.md
+      - SynthDef Implementation: technical/synthdef.md
+      - Synth Evolution: technical/synth-evolution.md
+      - MIDI Converter: technical/midi-converter.md
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - toc:
+      permalink: true
+
+extra:
+  version:
+    provider: mike
