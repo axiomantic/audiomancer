@@ -86,17 +86,18 @@ See [MCP Server](mcp-server.md) for details.
 
 ## System Architecture
 
-![Audiomancer Architecture](../assets/architecture.svg)
+![Audiomancer Architecture](../assets/architecture-light.svg#only-light)
+![Audiomancer Architecture](../assets/architecture-dark.svg#only-dark)
 
 The diagram shows the complete data flow through the system:
 
 1. **Sample Library** (source directory) contains original sample packs
-2. **Library Manager** copies files to local cache and creates symlinks
-3. **Audio Analyzers** extract features and generate ML embeddings
-4. **Storage Layer** persists metadata (SQLite) and vectors (LanceDB)
-5. **Pattern Generators** query samples and create TidalCycles code
-6. **MCP Server** exposes 15 tools to AI clients
-7. **SuperDirt** loads enabled samples via symlinks
+1. **Library Manager** copies files to local cache and creates symlinks
+1. **Audio Analyzers** extract features and generate ML embeddings
+1. **Storage Layer** persists metadata (SQLite) and vectors (LanceDB)
+1. **Pattern Generators** query samples and create TidalCycles code
+1. **MCP Server** exposes 15 tools to AI clients
+1. **SuperDirt** loads enabled samples via symlinks
 
 ### Data Flow
 

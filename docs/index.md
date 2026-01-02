@@ -17,7 +17,8 @@ It's designed for TidalCycles live coding but the analysis and search features w
 
 ## Architecture
 
-![Audiomancer Architecture](assets/architecture.svg)
+![Audiomancer Architecture](assets/architecture-light.svg#only-light)
+![Audiomancer Architecture](assets/architecture-dark.svg#only-dark)
 
 **Quick overview:**
 
