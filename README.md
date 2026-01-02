@@ -13,8 +13,6 @@
 
 MCP server for AI-assisted music production with TidalCycles. Manage sample libraries, analyze audio, generate patterns, and enable AI-driven live coding workflows.
 
-![audiomancer CLI demo](docs/assets/gifs/cli-overview.gif)
-
 ## Features
 
 - **AI-powered sample library management** - Browse and enable sample packs from your sample library via conversation

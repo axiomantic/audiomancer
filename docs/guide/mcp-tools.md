@@ -1,7 +1,5 @@
 # MCP Tools
 
-![MCP server demo](../assets/gifs/mcp-demo.gif)
-
 ## Library Management (7 tools)
 
 | Tool                   | Description                            |

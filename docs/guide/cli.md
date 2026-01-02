@@ -1,7 +1,5 @@
 # CLI Commands
 
-![CLI overview](../assets/gifs/cli-overview.gif)
-
 ## Project Management
 
 ### Initialize a New Project
@@ -16,8 +14,6 @@ audiomancer init --path PATH  # Create project at specific path
 ```bash
 audiomancer doctor            # Check all dependencies
 ```
-
-![audiomancer doctor](../assets/gifs/doctor.gif)
 
 ## MCP Server
 
@@ -35,15 +31,11 @@ audiomancer serve             # Start MCP server
 audiomancer scan ~/Samples    # Scan and import sample folders
 ```
 
-![audiomancer scan](../assets/gifs/scan.gif)
-
 ### Search Samples
 
 ```bash
 audiomancer search "dark kick" # Search from CLI
 ```
-
-![audiomancer search](../assets/gifs/search.gif)
 
 ### Statistics
 
