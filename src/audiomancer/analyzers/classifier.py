@@ -6,7 +6,7 @@ moods, and genres using pre-trained Essentia TensorFlow models.
 
 import numpy as np
 import essentia.standard as es
-from typing import Optional
+from typing import Optional, Any
 
 from ..errors import AnalysisFailedError, ModelLoadError
 from .models import load_model
@@ -64,7 +64,7 @@ def classify_instrument(
     sr: int,
     model_path: Optional[str] = None,
     top_k: int = 3,
-) -> dict:
+) -> dict[str, Any]:
     """Classify audio into instrument categories using Essentia's pre-trained models.
 
     Uses MTG-Jamendo instrument classification model to detect instrument presence.

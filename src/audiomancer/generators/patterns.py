@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional
 
 import mido
 from mido import Message, MidiFile, MidiTrack
@@ -124,7 +124,7 @@ class Pattern:
         self.mutation_amount = mutation_amount
         self.created_at = datetime.now()
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "id": self.id,
@@ -934,9 +934,13 @@ def humanize(
     new_midi.save(file=output_buffer)
     new_midi_data = output_buffer.getvalue()
 
+    # Type assertion: we know pattern.type is one of the valid literals
+    from typing import cast
+    pattern_type = cast(Literal["drums", "melody", "bass"], pattern.type)
+
     return Pattern(
         pattern_id=new_id,
-        pattern_type=pattern.type,
+        pattern_type=pattern_type,
         midi_data=new_midi_data,
         tidal_code=pattern.tidal_code,
         sc_code=pattern.sc_code,

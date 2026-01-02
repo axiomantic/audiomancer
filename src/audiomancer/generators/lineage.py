@@ -66,7 +66,7 @@ class SynthRecord:
     mutation_log: List[str]
     user_rating: Optional[int] = None
     user_notes: Optional[str] = None
-    created_at: datetime = None
+    created_at: Optional[datetime] = None
 
     def __post_init__(self):
         if self.created_at is None:
@@ -333,10 +333,10 @@ class LineageTracker:
 
         # Apply minimum rating filter
         if min_rating is not None:
-            rated = [r for r in rated if r.user_rating >= min_rating]
+            rated = [r for r in rated if r.user_rating is not None and r.user_rating >= min_rating]
 
-        # Sort by rating (descending)
-        rated.sort(key=lambda r: r.user_rating, reverse=True)
+        # Sort by rating (descending) - we know all have non-None ratings
+        rated.sort(key=lambda r: r.user_rating or 0, reverse=True)
 
         # Convert to dict and limit
         return [asdict(r) for r in rated[:limit]]

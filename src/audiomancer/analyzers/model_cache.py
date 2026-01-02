@@ -8,13 +8,14 @@ for the lifetime of the Python process.
 """
 
 import essentia.standard as es
-from typing import Optional
+from typing import Optional, Any, cast
 
-from .models import load_model
+from .models import load_model, ModelType
 
 
 # Global model cache - persists for process lifetime
-_model_cache: dict[str, es.TensorflowPredict] = {}
+# We use Any for values to allow different TensorflowPredict subclasses
+_model_cache: dict[str, Any] = {}
 
 
 def get_effnet_model() -> es.TensorflowPredictEffnetDiscogs:
@@ -37,13 +38,14 @@ def get_effnet_model() -> es.TensorflowPredictEffnetDiscogs:
     cache_key = "discogs_effnet"
 
     if cache_key not in _model_cache:
-        effnet_path = str(load_model("discogs_effnet"))
+        model_type: ModelType = "discogs_effnet"
+        effnet_path = str(load_model(model_type))
         _model_cache[cache_key] = es.TensorflowPredictEffnetDiscogs(
             graphFilename=effnet_path,
             output="PartitionedCall:1",
         )
 
-    return _model_cache[cache_key]
+    return cast(es.TensorflowPredictEffnetDiscogs, _model_cache[cache_key])
 
 
 def get_classifier_model(model_name: str) -> es.TensorflowPredict2D:
@@ -68,14 +70,16 @@ def get_classifier_model(model_name: str) -> es.TensorflowPredict2D:
         >>> assert classifier is classifier2
     """
     if model_name not in _model_cache:
-        model_path = str(load_model(model_name))
+        # Cast is safe here because callers validate model_name
+        model_type = cast(ModelType, model_name)
+        model_path = str(load_model(model_type))
         _model_cache[model_name] = es.TensorflowPredict2D(
             graphFilename=model_path,
             input="model/Placeholder",
             output="model/Sigmoid",
         )
 
-    return _model_cache[model_name]
+    return cast(es.TensorflowPredict2D, _model_cache[model_name])
 
 
 def get_embedding_model(model_name: str = "musicnn") -> es.TensorflowPredict:
@@ -102,7 +106,9 @@ def get_embedding_model(model_name: str = "musicnn") -> es.TensorflowPredict:
     cache_key = f"embedding_{model_name}"
 
     if cache_key not in _model_cache:
-        model_path = str(load_model(model_name))
+        # Cast is safe here because callers validate model_name
+        model_type = cast(ModelType, model_name)
+        model_path = str(load_model(model_type))
 
         # Model-specific configuration
         if model_name == "vggish":
@@ -127,7 +133,7 @@ def get_embedding_model(model_name: str = "musicnn") -> es.TensorflowPredict:
                 graphFilename=model_path,
             )
 
-    return _model_cache[cache_key]
+    return cast(es.TensorflowPredict, _model_cache[cache_key])
 
 
 def clear_cache() -> None:
@@ -151,7 +157,7 @@ def clear_cache() -> None:
     _model_cache.clear()
 
 
-def get_cache_stats() -> dict[str, int]:
+def get_cache_stats() -> dict[str, int | list[str]]:
     """Get statistics about the model cache.
 
     Returns:

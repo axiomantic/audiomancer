@@ -452,7 +452,8 @@ class UnifiedSampleStorage:
         # Intersect: only samples that match both criteria
         results = []
         for sample in text_results:
-            if sample["id"] in candidate_ids:
+            sample_id = sample.get("id")
+            if sample_id is not None and sample_id in candidate_ids:
                 results.append(sample)
                 if len(results) >= limit:
                     break

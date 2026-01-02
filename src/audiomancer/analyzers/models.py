@@ -10,7 +10,7 @@ import hashlib
 import json
 import urllib.request
 from pathlib import Path
-from typing import Optional, Literal
+from typing import Optional, Literal, cast, Any
 
 from ..errors import ModelLoadError
 
@@ -256,7 +256,7 @@ def load_model(
     return download_model(model_type)
 
 
-def list_models(include_cached_only: bool = False) -> dict[str, dict]:
+def list_models(include_cached_only: bool = False) -> dict[str, dict[str, Any]]:
     """List available models and their status.
 
     Args:
@@ -277,14 +277,16 @@ def list_models(include_cached_only: bool = False) -> dict[str, dict]:
     """
     result = {}
 
-    for model_type, info in MODEL_REGISTRY.items():
+    for model_name, info in MODEL_REGISTRY.items():
+        # Keys in MODEL_REGISTRY are guaranteed to be ModelType literals
+        model_type = cast(ModelType, model_name)
         model_path = get_model_path(model_type)
         cached = model_path.exists()
 
         if include_cached_only and not cached:
             continue
 
-        result[model_type] = {
+        result[model_name] = {
             "cached": cached,
             "path": str(model_path) if cached else None,
             "description": info["description"],

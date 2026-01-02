@@ -201,10 +201,10 @@ def extract_spectral_features(
 
     # Return mean values across all frames
     return SpectralFeatures(
-        spectral_centroid=validate_value(np.mean(centroids_arr), "spectral_centroid"),
-        spectral_bandwidth=validate_value(np.mean(bandwidths_arr), "spectral_bandwidth"),
-        spectral_rolloff=validate_value(np.mean(rolloffs_arr), "spectral_rolloff"),
-        zero_crossing_rate=validate_value(np.mean(zcrs_arr), "zero_crossing_rate"),
-        rms_energy=validate_value(np.mean(rms_arr), "rms_energy"),
+        spectral_centroid=validate_value(float(np.mean(centroids_arr)), "spectral_centroid"),
+        spectral_bandwidth=validate_value(float(np.mean(bandwidths_arr)), "spectral_bandwidth"),
+        spectral_rolloff=validate_value(float(np.mean(rolloffs_arr)), "spectral_rolloff"),
+        zero_crossing_rate=validate_value(float(np.mean(zcrs_arr)), "zero_crossing_rate"),
+        rms_energy=validate_value(float(np.mean(rms_arr)), "rms_energy"),
         dynamic_range=validate_value(dynamic_range, "dynamic_range"),
     )

@@ -463,7 +463,7 @@ def add_modulation(code: str, param: str) -> tuple[str, Optional[str]]:
     # Find parameter usage (not in declaration)
     param_pattern = rf'(\W){param}(\W)'
 
-    def replace_param(match):
+    def replace_param(match: re.Match[str]) -> str:
         # Don't replace in |param=default| declaration
         if '|' in code[max(0, match.start()-20):match.start()]:
             return match.group(0)
@@ -554,7 +554,7 @@ def modify_parameter_defaults(code: str, amount: float) -> tuple[str, list[str]]
     # Parse individual parameters
     param_pattern = r'(\w+)\s*=\s*([\d.]+)'
 
-    def modify_value(match):
+    def modify_value(match: re.Match[str]) -> str:
         param_name = match.group(1)
         old_value = float(match.group(2))
 

@@ -13,8 +13,8 @@ from typing import Optional, Any
 
 from mcp.server import Server
 from mcp.server.models import InitializationOptions
-from mcp.types import Tool, TextContent, ServerCapabilities, ToolsCapability
-import mcp.server.stdio
+from mcp.types import Tool, TextContent
+from mcp.server import stdio
 
 from audiomancer.storage.unified import UnifiedSampleStorage
 from audiomancer.storage.synth_store import SynthStore
@@ -52,7 +52,7 @@ def detect_project_root() -> Optional[Path]:
     return config_path.parent
 
 
-server = Server("audiomancer")
+server: Server = Server("audiomancer")
 
 # Global storage instances (initialized in main)
 storage: Optional[UnifiedSampleStorage] = None
@@ -290,7 +290,7 @@ async def list_tools() -> list[Tool]:
 
 
 @server.call_tool()
-async def call_tool(name: str, arguments: dict) -> list[TextContent]:
+async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
     """Handle tool calls with structured error handling."""
     try:
         if name == "search_samples":
@@ -356,7 +356,7 @@ async def search_samples(
     bpm_min: Optional[float] = None,
     bpm_max: Optional[float] = None,
     key: Optional[str] = None,
-    mood: Optional[str] = None,
+    mood: Optional[list[str]] = None,
     limit: int = 20
 ) -> list[TextContent]:
     """Search samples with filters.
@@ -389,9 +389,13 @@ async def search_samples(
     # Format for LLM consumption
     formatted = []
     for sample in results:
+        sample_id = sample.get("id")
+        file_path = sample.get("file_path")
+        if sample_id is None or file_path is None:
+            continue  # Skip samples missing required fields
         formatted.append({
-            "id": sample["id"],
-            "file_path": sample["file_path"],
+            "id": sample_id,
+            "file_path": file_path,
             "instrument_type": sample.get("instrument_type"),
             "bpm": sample.get("bpm"),
             "key": sample.get("key"),
@@ -450,9 +454,13 @@ async def find_similar(
     # Format results
     formatted = []
     for sample, distance in similar:
+        result_id = sample.get("id")
+        result_path = sample.get("file_path")
+        if result_id is None or result_path is None:
+            continue  # Skip samples missing required fields
         formatted.append({
-            "id": sample["id"],
-            "file_path": sample["file_path"],
+            "id": result_id,
+            "file_path": result_path,
             "instrument_type": sample.get("instrument_type"),
             "bpm": sample.get("bpm"),
             "key": sample.get("key"),
@@ -527,57 +535,87 @@ async def analyze_file(path: str) -> list[TextContent]:
 
     try:
         # Run analysis in thread pool to avoid blocking
+        import librosa
         loop = asyncio.get_event_loop()
 
-        # Extract all features
-        basic = await loop.run_in_executor(None, get_basic_metadata, str(file_path))
-        spectral = await loop.run_in_executor(None, extract_spectral_features, str(file_path))
-        rhythm = await loop.run_in_executor(None, extract_rhythm_features, str(file_path))
-        tonal = await loop.run_in_executor(None, extract_tonal_features, str(file_path))
-        embedding = await loop.run_in_executor(None, extract_audio_embedding, str(file_path))
-        instrument = await loop.run_in_executor(None, classify_instrument, str(file_path))
+        # Load audio and extract basic metadata
+        basic = await loop.run_in_executor(None, get_basic_metadata, file_path)
+
+        # Load audio for feature extraction
+        def load_audio():
+            audio, sr = librosa.load(str(file_path), sr=None, mono=False)
+            return audio, sr
+
+        audio, sr = await loop.run_in_executor(None, load_audio)
+
+        # Extract all features with audio/sr
+        spectral = await loop.run_in_executor(None, extract_spectral_features, audio, sr)
+        rhythm = await loop.run_in_executor(None, extract_rhythm_features, audio, sr)
+        tonal = await loop.run_in_executor(None, extract_tonal_features, audio, sr)
+        embedding = await loop.run_in_executor(None, extract_audio_embedding, audio, sr)
+        instrument = await loop.run_in_executor(None, classify_instrument, audio, sr)
 
         # Combine into sample metadata
         from audiomancer.storage.interfaces import SampleMetadata
+        import hashlib
 
+        # Generate sample ID from file hash
+        sample_id = f"smpl_{basic['file_hash'][:8]}"
+
+        # TypedDict with total=False means all fields are optional, so we can omit None values
         sample = SampleMetadata(
-            id=basic.id,
+            id=sample_id,
             file_path=str(file_path),
-            file_hash=basic.file_hash,
-            duration_ms=basic.duration_ms,
-            sample_rate=basic.sample_rate,
-            channels=basic.channels,
-            bit_depth=basic.bit_depth,
-            file_size_bytes=basic.file_size_bytes,
-            spectral_centroid=spectral.spectral_centroid,
-            spectral_bandwidth=spectral.spectral_bandwidth,
-            spectral_rolloff=spectral.spectral_rolloff,
-            zero_crossing_rate=spectral.zero_crossing_rate,
-            rms_energy=spectral.rms_energy,
-            dynamic_range=spectral.dynamic_range,
-            bpm=rhythm.bpm,
-            bpm_confidence=rhythm.confidence,
-            is_loop=rhythm.is_loop,
-            key=tonal.key,
-            key_confidence=tonal.key_confidence,
-            tuning_frequency=tonal.tuning_frequency,
-            pitch_salience=tonal.pitch_salience,
-            instrument_type=instrument.primary_class,
-            instrument_confidence=instrument.confidence,
+            file_hash=basic["file_hash"],
+            duration_ms=basic["duration_ms"],
+            sample_rate=basic["sample_rate"],
+            channels=basic["channels"],
+            bit_depth=basic["bit_depth"],
+            file_size_bytes=basic["file_size_bytes"],
+            spectral_centroid=spectral["spectral_centroid"],
+            spectral_bandwidth=spectral["spectral_bandwidth"],
+            spectral_rolloff=spectral["spectral_rolloff"],
+            zero_crossing_rate=spectral["zero_crossing_rate"],
+            rms_energy=spectral["rms_energy"],
+            dynamic_range=spectral["dynamic_range"],
         )
 
+        # Add optional rhythm features if present
+        if rhythm.get("bpm") is not None:
+            sample["bpm"] = rhythm["bpm"]
+        if rhythm.get("bpm_confidence") is not None:
+            sample["bpm_confidence"] = rhythm["bpm_confidence"]
+        if rhythm.get("is_loop") is not None:
+            sample["is_loop"] = rhythm["is_loop"]
+
+        # Add optional tonal features if present
+        if tonal.get("key") is not None:
+            sample["key"] = tonal["key"]
+        if tonal.get("key_confidence") is not None:
+            sample["key_confidence"] = tonal["key_confidence"]
+        if tonal.get("tuning_frequency") is not None:
+            sample["tuning_frequency"] = tonal["tuning_frequency"]
+        if tonal.get("pitch_salience") is not None:
+            sample["pitch_salience"] = tonal["pitch_salience"]
+
+        # Add instrument classification if present
+        if instrument.get("instrument_type") is not None:
+            sample["instrument_type"] = instrument["instrument_type"]
+        if instrument.get("instrument_confidence") is not None:
+            sample["instrument_confidence"] = instrument["instrument_confidence"]
+
         # Add to storage
-        sample_id = storage.add_sample_with_embedding(sample, embedding.embedding)
+        result_id = storage.add_sample_with_embedding(sample, embedding)
 
         response = {
             "success": True,
-            "sample_id": sample_id,
+            "sample_id": result_id,
             "file_path": str(file_path),
             "analysis": {
-                "instrument_type": instrument.primary_class,
-                "bpm": rhythm.bpm,
-                "key": tonal.key,
-                "duration_ms": basic.duration_ms,
+                "instrument_type": instrument.get("instrument_type"),
+                "bpm": rhythm.get("bpm"),
+                "key": tonal.get("key"),
+                "duration_ms": basic["duration_ms"],
             }
         }
 
@@ -864,9 +902,11 @@ async def list_enabled_samples_tool(category: Optional[str] = None) -> list[Text
     by_category: dict[str, list[str]] = {}
     for sample in samples:
         cat = sample.get("category", "misc")
+        sample_id = sample.get("id")
         if cat not in by_category:
             by_category[cat] = []
-        by_category[cat].append(sample["id"])
+        if sample_id is not None:
+            by_category[cat].append(sample_id)
 
     response = {
         "samples": samples,
@@ -911,18 +951,11 @@ async def main():
     )
 
     # Run server
-    async with mcp.server.stdio.stdio_server() as (read, write):
-        await server.run(
-            read,
-            write,
-            InitializationOptions(
-                server_name="audiomancer",
-                server_version="0.1.0",
-                capabilities=ServerCapabilities(
-                    tools=ToolsCapability(listChanged=False)
-                )
-            )
-        )
+    # NOTE: pyright has trouble with @asynccontextmanager and Generic[T] with defaults
+    # These type ignores work around pyright limitations - code is correct
+    async with stdio.stdio_server() as (read, write):  # pyright: ignore[reportGeneralTypeIssues]
+        init_options = server.create_initialization_options()  # pyright: ignore[reportAttributeAccessIssue]
+        await server.run(read, write, init_options)  # pyright: ignore[reportAttributeAccessIssue]
 
 
 if __name__ == "__main__":

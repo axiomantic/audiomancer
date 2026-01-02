@@ -4,7 +4,7 @@ This module defines Protocol interfaces for parsing and analyzing SuperCollider
 SynthDef files to extract controls and metadata.
 """
 
-from typing import Literal, Optional, Protocol
+from typing import Literal, Optional, Protocol, Any
 from typing_extensions import TypedDict
 
 
@@ -400,7 +400,7 @@ class SynthDefStore(Protocol):
         """
         ...
 
-    def update(self, synth_id: str, updates: dict) -> bool:
+    def update(self, synth_id: str, updates: dict[str, Any]) -> bool:
         """Update SynthDef fields.
 
         Args:

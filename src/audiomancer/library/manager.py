@@ -575,15 +575,18 @@ class LibraryManager:
                 continue
 
             # Check BPM match (with tolerance)
-            if bpm is not None and sample.get("bpm") is not None:
-                if abs(sample["bpm"] - bpm) > 10:
+            sample_bpm = sample.get("bpm")
+            if bpm is not None and sample_bpm is not None:
+                if abs(sample_bpm - bpm) > 10:
                     continue
 
             # Check loop/one-shot match
             if is_loop is not None and sample.get("is_loop") != is_loop:
                 continue
 
-            matches.append(sample["id"])
+            sample_id = sample.get("id")
+            if sample_id:
+                matches.append(sample_id)
 
             if len(matches) >= limit:
                 break

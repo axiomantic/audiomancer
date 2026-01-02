@@ -108,9 +108,13 @@ class EvolutionEngine:
             '\\amp, 0.', f'\\amp, {0.8 - amount * 0.2},'
         )
 
+        # Type assertion: we know pattern.type is one of the valid literals
+        from typing import cast, Literal
+        pattern_type = cast(Literal["drums", "melody", "bass"], pattern.type)
+
         return Pattern(
             pattern_id=new_id,
-            pattern_type=pattern.type,
+            pattern_type=pattern_type,
             midi_data=pattern.midi_data,  # In real impl, mutate MIDI
             tidal_code=mutated_tidal,
             sc_code=mutated_sc,
@@ -183,9 +187,13 @@ class EvolutionEngine:
         # Average BPM
         avg_bpm = (pattern_a.bpm + pattern_b.bpm) / 2
 
+        # Type assertion: we know pattern_a.type is one of the valid literals
+        from typing import cast, Literal
+        pattern_type = cast(Literal["drums", "melody", "bass"], pattern_a.type)
+
         return Pattern(
             pattern_id=new_id,
-            pattern_type=pattern_a.type,
+            pattern_type=pattern_type,
             midi_data=pattern_a.midi_data,  # In real impl, merge MIDI
             tidal_code=hybrid_tidal,
             sc_code=hybrid_sc,

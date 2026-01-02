@@ -9,7 +9,7 @@ atomic (all-or-nothing with automatic rollback on error).
 
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 import json
 import sqlite3
 
@@ -27,6 +27,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.engine import Connection
+from sqlalchemy.pool import ConnectionPoolEntry
 
 from audiomancer.errors import (
     DuplicateSampleError,
@@ -221,7 +223,7 @@ class SampleStore:
 
         # Enable foreign key constraints
         @event.listens_for(self.engine, "connect")
-        def set_sqlite_pragma(dbapi_conn, connection_record):
+        def set_sqlite_pragma(dbapi_conn: Any, connection_record: Any) -> None:
             cursor = dbapi_conn.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.close()
@@ -238,57 +240,60 @@ class SampleStore:
         Returns:
             SampleMetadata dictionary with all fields
         """
-        result: SampleMetadata = {
-            "id": sample.id,
-            "file_path": sample.file_path,
-            "file_hash": sample.file_hash,
-            "duration_ms": sample.duration_ms,
-            "sample_rate": sample.sample_rate,
-            "channels": sample.channels,
-            "bit_depth": sample.bit_depth,
-            "file_size_bytes": sample.file_size_bytes,
-            "created_at": datetime.fromisoformat(sample.created_at),
-            "updated_at": datetime.fromisoformat(sample.updated_at),
-        }
+        # Type narrowing: SQLAlchemy returns actual values, not Column objects at runtime
+        result: SampleMetadata = {}
 
-        # Add optional fields if present
-        if sample.spectral_centroid is not None:
-            result["spectral_centroid"] = sample.spectral_centroid
-        if sample.spectral_bandwidth is not None:
-            result["spectral_bandwidth"] = sample.spectral_bandwidth
-        if sample.spectral_rolloff is not None:
-            result["spectral_rolloff"] = sample.spectral_rolloff
-        if sample.zero_crossing_rate is not None:
-            result["zero_crossing_rate"] = sample.zero_crossing_rate
-        if sample.rms_energy is not None:
-            result["rms_energy"] = sample.rms_energy
-        if sample.dynamic_range is not None:
-            result["dynamic_range"] = sample.dynamic_range
+        # Required fields
+        result["id"] = str(sample.id)
+        result["file_path"] = str(sample.file_path)
+        result["file_hash"] = str(sample.file_hash)
+        # These are stored as numeric types, cast to ensure type safety
+        result["duration_ms"] = float(sample.duration_ms) if isinstance(sample.duration_ms, (int, float)) else 0.0
+        result["sample_rate"] = int(sample.sample_rate) if isinstance(sample.sample_rate, int) else 0
+        result["channels"] = int(sample.channels) if isinstance(sample.channels, int) else 0
+        result["bit_depth"] = int(sample.bit_depth) if isinstance(sample.bit_depth, int) else 0
+        result["file_size_bytes"] = int(sample.file_size_bytes) if isinstance(sample.file_size_bytes, int) else 0
+        result["created_at"] = datetime.fromisoformat(str(sample.created_at))
+        result["updated_at"] = datetime.fromisoformat(str(sample.updated_at))
 
-        if sample.bpm is not None:
-            result["bpm"] = sample.bpm
-        if sample.bpm_confidence is not None:
-            result["bpm_confidence"] = sample.bpm_confidence
+        # Add optional fields if present - using isinstance for type narrowing
+        if sample.spectral_centroid is not None and isinstance(sample.spectral_centroid, (int, float)):
+            result["spectral_centroid"] = float(sample.spectral_centroid)
+        if sample.spectral_bandwidth is not None and isinstance(sample.spectral_bandwidth, (int, float)):
+            result["spectral_bandwidth"] = float(sample.spectral_bandwidth)
+        if sample.spectral_rolloff is not None and isinstance(sample.spectral_rolloff, (int, float)):
+            result["spectral_rolloff"] = float(sample.spectral_rolloff)
+        if sample.zero_crossing_rate is not None and isinstance(sample.zero_crossing_rate, (int, float)):
+            result["zero_crossing_rate"] = float(sample.zero_crossing_rate)
+        if sample.rms_energy is not None and isinstance(sample.rms_energy, (int, float)):
+            result["rms_energy"] = float(sample.rms_energy)
+        if sample.dynamic_range is not None and isinstance(sample.dynamic_range, (int, float)):
+            result["dynamic_range"] = float(sample.dynamic_range)
+
+        if sample.bpm is not None and isinstance(sample.bpm, (int, float)):
+            result["bpm"] = float(sample.bpm)
+        if sample.bpm_confidence is not None and isinstance(sample.bpm_confidence, (int, float)):
+            result["bpm_confidence"] = float(sample.bpm_confidence)
         if sample.is_loop is not None:
             result["is_loop"] = bool(sample.is_loop)
 
         if sample.key is not None:
-            result["key"] = sample.key
-        if sample.key_confidence is not None:
-            result["key_confidence"] = sample.key_confidence
-        if sample.tuning_frequency is not None:
-            result["tuning_frequency"] = sample.tuning_frequency
-        if sample.pitch_salience is not None:
-            result["pitch_salience"] = sample.pitch_salience
+            result["key"] = str(sample.key)
+        if sample.key_confidence is not None and isinstance(sample.key_confidence, (int, float)):
+            result["key_confidence"] = float(sample.key_confidence)
+        if sample.tuning_frequency is not None and isinstance(sample.tuning_frequency, (int, float)):
+            result["tuning_frequency"] = float(sample.tuning_frequency)
+        if sample.pitch_salience is not None and isinstance(sample.pitch_salience, (int, float)):
+            result["pitch_salience"] = float(sample.pitch_salience)
 
         if sample.instrument_type is not None:
-            result["instrument_type"] = sample.instrument_type
-        if sample.instrument_confidence is not None:
-            result["instrument_confidence"] = sample.instrument_confidence
+            result["instrument_type"] = str(sample.instrument_type)
+        if sample.instrument_confidence is not None and isinstance(sample.instrument_confidence, (int, float)):
+            result["instrument_confidence"] = float(sample.instrument_confidence)
         if sample.mood is not None:
-            result["mood"] = json.loads(sample.mood)
+            result["mood"] = json.loads(str(sample.mood))
         if sample.genre_tags is not None:
-            result["genre_tags"] = json.loads(sample.genre_tags)
+            result["genre_tags"] = json.loads(str(sample.genre_tags))
 
         return result
 
@@ -325,14 +330,14 @@ class SampleStore:
             genre_tags = json.dumps(genre_tags)
 
         return Sample(
-            id=sample_dict["id"],
-            file_path=sample_dict["file_path"],
-            file_hash=sample_dict["file_hash"],
-            duration_ms=sample_dict["duration_ms"],
-            sample_rate=sample_dict["sample_rate"],
-            channels=sample_dict["channels"],
-            bit_depth=sample_dict["bit_depth"],
-            file_size_bytes=sample_dict["file_size_bytes"],
+            id=sample_dict.get("id", ""),
+            file_path=sample_dict.get("file_path", ""),
+            file_hash=sample_dict.get("file_hash", ""),
+            duration_ms=sample_dict.get("duration_ms", 0.0),
+            sample_rate=sample_dict.get("sample_rate", 0),
+            channels=sample_dict.get("channels", 0),
+            bit_depth=sample_dict.get("bit_depth", 0),
+            file_size_bytes=sample_dict.get("file_size_bytes", 0),
             spectral_centroid=sample_dict.get("spectral_centroid"),
             spectral_bandwidth=sample_dict.get("spectral_bandwidth"),
             spectral_rolloff=sample_dict.get("spectral_rolloff"),
@@ -384,21 +389,22 @@ class SampleStore:
         session = self.SessionLocal()
         try:
             # Check for existing sample with same hash
-            existing = session.query(Sample).filter_by(file_hash=sample["file_hash"]).first()
+            file_hash = sample.get("file_hash", "")
+            existing = session.query(Sample).filter_by(file_hash=file_hash).first()
             if existing:
                 raise DuplicateSampleError(
-                    existing_id=existing.id,
-                    path=sample["file_path"],
+                    existing_id=str(existing.id),
+                    path=sample.get("file_path", ""),
                     details={
-                        "existing_path": existing.file_path,
-                        "file_hash": sample["file_hash"],
+                        "existing_path": str(existing.file_path),
+                        "file_hash": file_hash,
                     },
                 )
 
             db_sample = self._dict_to_sample(sample)
             session.add(db_sample)
             session.commit()
-            return db_sample.id
+            return str(db_sample.id)
 
         except DuplicateSampleError:
             session.rollback()
@@ -447,14 +453,15 @@ class SampleStore:
 
             # Check for duplicates first (fail fast before any inserts)
             for sample in samples:
-                existing = session.query(Sample).filter_by(file_hash=sample["file_hash"]).first()
+                file_hash = sample.get("file_hash", "")
+                existing = session.query(Sample).filter_by(file_hash=file_hash).first()
                 if existing:
                     raise DuplicateSampleError(
-                        existing_id=existing.id,
-                        path=sample["file_path"],
+                        existing_id=str(existing.id),
+                        path=sample.get("file_path", ""),
                         details={
-                            "existing_path": existing.file_path,
-                            "file_hash": sample["file_hash"],
+                            "existing_path": str(existing.file_path),
+                            "file_hash": file_hash,
                         },
                     )
 
@@ -462,7 +469,7 @@ class SampleStore:
             for sample in samples:
                 db_sample = self._dict_to_sample(sample)
                 session.add(db_sample)
-                ids.append(db_sample.id)
+                ids.append(str(db_sample.id))
 
             # Commit all at once (atomic)
             session.commit()
@@ -559,7 +566,7 @@ class SampleStore:
         finally:
             session.close()
 
-    def update(self, sample_id: str, updates: dict) -> bool:
+    def update(self, sample_id: str, updates: dict[str, Any]) -> bool:
         """Update sample fields.
 
         Only updates specified fields, leaving others unchanged. Automatically
@@ -602,7 +609,7 @@ class SampleStore:
                     setattr(sample, key, value)
 
             # Always update timestamp
-            sample.updated_at = datetime.now().isoformat()
+            setattr(sample, "updated_at", datetime.now().isoformat())
 
             session.commit()
             return True
@@ -881,12 +888,6 @@ class SampleStore:
 
 # TODO: Implement PatternStore following the same patterns
 # For now, it's a placeholder to complete the module structure
-class PatternStore:
-    """Placeholder for PatternStore implementation."""
-
-    pass
-
-
 class PatternStore:
     """Placeholder for PatternStore implementation."""
 

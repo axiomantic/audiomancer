@@ -29,16 +29,19 @@ repos:
         name: Ruff formatter
         files: '(\.py$|\.py\.template$)'
 
-  # Python type checking with mypy
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.13.0
+  # Python type checking with pyright
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.390
     hooks:
-      - id: mypy
-        name: Type check with mypy
+      - id: pyright
+        name: Type check with pyright
         files: '(\.py$|\.py\.template$)'
         additional_dependencies:
           - types-PyYAML
           - pydantic
+          - pydantic-settings
+          - types-tqdm
+          # Note: essentia and faiss are C++ bindings - use local stubs
 
   # Markdown formatting
   - repo: https://github.com/hukkin/mdformat

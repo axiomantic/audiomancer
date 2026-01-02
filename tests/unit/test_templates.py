@@ -144,19 +144,30 @@ Version: 1.0.0"""
 def test_get_template_variables_paths_resolved():
     """get_template_variables returns absolute paths."""
     project_name = "test-project"
-    # Use relative paths as input
-    project_root = Path("relative/path/project")
-    sample_source = Path("relative/samples")
+    # Use absolute paths as input (required by validation)
+    project_root = Path("/tmp/test-project")
+    sample_source = Path("/tmp/samples")
 
     variables = get_template_variables(project_name, project_root, sample_source)
 
-    # Verify paths are absolute
+    # Verify paths are absolute in output
     assert Path(variables["project_root"]).is_absolute()
     assert Path(variables["sample_source"]).is_absolute()
 
-    # Verify they match the absolute versions
-    assert variables["project_root"] == str(project_root.absolute())
-    assert variables["sample_source"] == str(sample_source.absolute())
+    # Verify they match the input paths
+    assert variables["project_root"] == str(project_root)
+    assert variables["sample_source"] == str(sample_source)
+
+
+def test_get_template_variables_rejects_relative_paths():
+    """get_template_variables raises ValueError for relative paths."""
+    import pytest
+
+    with pytest.raises(ValueError, match="must be absolute"):
+        get_template_variables("test", Path("relative/path"), Path("/abs/path"))
+
+    with pytest.raises(ValueError, match="must be absolute"):
+        get_template_variables("test", Path("/abs/path"), Path("relative/path"))
 
 
 def test_template_subdirectories_exist():

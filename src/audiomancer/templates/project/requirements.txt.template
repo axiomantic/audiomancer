@@ -9,5 +9,11 @@
 
 # Sample library management
 aiofiles
-tqdm
+tqdm>=4.66.0
 rich
+
+# Interactive TUI
+questionary>=2.0.0
+
+# Development: Type stubs
+types-tqdm>=4.66.0

@@ -5,7 +5,7 @@ Extracts tempo, beat positions, and loop detection using Essentia.
 
 import essentia.standard as es
 import numpy as np
-from typing import Optional
+from typing import Optional, Any
 
 from ..errors import AnalysisFailedError
 
@@ -13,7 +13,7 @@ from ..errors import AnalysisFailedError
 def extract_rhythm_features(
     audio: np.ndarray,
     sr: int
-) -> dict:
+) -> dict[str, Any]:
     """
     Extract rhythm/tempo features using Essentia.
 

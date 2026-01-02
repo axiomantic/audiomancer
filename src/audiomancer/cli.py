@@ -4,7 +4,7 @@ import sys
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, cast
 
 import typer
 from rich.console import Console
@@ -12,6 +12,8 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 from rich import print as rprint
+
+from audiomancer.storage.interfaces import SampleMetadata
 
 app = typer.Typer(
     name="audiomancer",
@@ -614,7 +616,7 @@ def scan(
         return
 
     # Initialize stores
-    sample_store = SampleStore(config.storage.db_path)
+    sample_store = SampleStore(str(config.storage.db_path))
     vector_store = LanceDBVectorStore(config.storage.embeddings_path)
 
     # Scan files with progress bar
@@ -668,8 +670,8 @@ def scan(
                         progress.update(task, description=f"Processing {file_path.name}...")
                         result = future.result()
 
-                        # Store sample
-                        sample_id = sample_store.add(result['metadata'])
+                        # Store sample (cast dict to SampleMetadata)
+                        sample_id = sample_store.add(cast(SampleMetadata, result['metadata']))
 
                         # Store embedding
                         if result['embedding'] is not None:
@@ -734,8 +736,8 @@ def scan(
                         'updated_at': datetime.now(),
                     }
 
-                    # Store sample
-                    sample_id = sample_store.add(sample_metadata)
+                    # Store sample (cast dict to SampleMetadata)
+                    sample_id = sample_store.add(cast(SampleMetadata, sample_metadata))
 
                     # Store embedding
                     if embedding is not None:
@@ -746,8 +748,9 @@ def scan(
                 except Exception as e:
                     errors += 1
                     # Show error with details from AudiomancerError
+                    from audiomancer.errors import AudiomancerError
                     error_msg = str(e)
-                    if hasattr(e, 'details') and e.details:
+                    if isinstance(e, AudiomancerError):
                         if 'stage' in e.details:
                             error_msg += f" (stage: {e.details['stage']})"
                         if 'error' in e.details:
@@ -817,7 +820,7 @@ def search(
 
     for sample in results:
         # Extract filename from path
-        name = Path(sample["file_path"]).name
+        name = Path(sample.get("file_path", "unknown")).name
 
         # Format BPM
         bpm_str = f"{sample.get('bpm', 0):.1f}" if sample.get('bpm') else "-"
@@ -833,7 +836,7 @@ def search(
         duration_str = f"{duration_ms / 1000:.2f}s"
 
         table.add_row(
-            sample['id'],
+            sample.get('id', 'unknown'),
             name,
             bpm_str,
             key_str,
@@ -852,7 +855,7 @@ def stats():
 
     # Load config and database
     config = load_config()
-    store = SampleStore(config.storage.db_path)
+    store = SampleStore(str(config.storage.db_path))
 
     # Get total count
     total_samples = store.count()

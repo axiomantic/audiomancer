@@ -63,7 +63,9 @@ class TestModelVerification:
     def test_verify_checksum_missing_file(self, tmp_path):
         """Test checksum verification with missing file."""
         missing_file = tmp_path / "missing.pb"
-        assert verify_model_checksum(missing_file, "abc123") is False
+        # Use valid SHA256 format (64 hex chars) to avoid placeholder logic
+        valid_sha256 = "a" * 64
+        assert verify_model_checksum(missing_file, valid_sha256) is False
 
 
 class TestModelDownload:

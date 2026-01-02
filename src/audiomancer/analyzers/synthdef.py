@@ -9,7 +9,7 @@ import json
 import re
 import hashlib
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 from dataclasses import dataclass, field
 
 from ..errors import SynthDefError, SubprocessTimeoutError
@@ -165,7 +165,7 @@ def parse_synthdef(path: Path, timeout: float = 10.0) -> SynthDefInfo:
     return info
 
 
-def _parse_with_sclang(path: Path, timeout: float) -> dict:
+def _parse_with_sclang(path: Path, timeout: float) -> dict[str, Any]:
     """Use sclang to parse SynthDef.
 
     Runs a SuperCollider script that loads the SynthDef and extracts metadata
@@ -259,7 +259,7 @@ def _parse_with_sclang(path: Path, timeout: float) -> dict:
     raise FileNotFoundError("sclang parsing not fully implemented - using regex fallback")
 
 
-def _parse_with_regex(path: Path, source: str) -> dict:
+def _parse_with_regex(path: Path, source: str) -> dict[str, Any]:
     """Fallback regex parser for when sclang unavailable.
 
     Less accurate than sclang but works without SuperCollider installed.

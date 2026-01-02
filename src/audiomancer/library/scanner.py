@@ -7,6 +7,7 @@ import os
 import re
 from collections import defaultdict
 from pathlib import Path
+from typing import Any
 
 from .schema import SampleInfo
 
@@ -288,7 +289,7 @@ def scan_source_packs(source_dir: Path) -> list[str]:
     )
 
 
-def scan_pack_files(source_dir: Path, pack_name: str) -> list[dict]:
+def scan_pack_files(source_dir: Path, pack_name: str) -> list[dict[str, Any]]:
     """Scan a pack and categorize all audio files.
 
     Args:
@@ -333,7 +334,7 @@ def scan_pack_files(source_dir: Path, pack_name: str) -> list[dict]:
 
 def group_files_into_samples(
     pack_name: str,
-    files: list[dict],
+    files: list[dict[str, Any]],
 ) -> dict[str, SampleInfo]:
     """Group files into sample folders by category.
 

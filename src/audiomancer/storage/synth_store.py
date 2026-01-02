@@ -76,17 +76,37 @@ class SynthStore:
         Returns:
             Dictionary with all fields
         """
+        # Extract string values from SQLAlchemy model
+        characteristics_str: Optional[str] = synth.characteristics  # type: ignore
+        categorization_str: Optional[str] = synth.categorization  # type: ignore
+        controls_str: Optional[str] = synth.controls  # type: ignore
+        created_at_str: str = synth.created_at  # type: ignore
+        updated_at_str: str = synth.updated_at  # type: ignore
+
+        # Parse JSON fields
+        characteristics_data: dict = {}
+        if characteristics_str is not None:
+            characteristics_data = json.loads(characteristics_str)
+
+        categorization_data: dict = {}
+        if categorization_str is not None:
+            categorization_data = json.loads(categorization_str)
+
+        controls_data: list = []
+        if controls_str is not None:
+            controls_data = json.loads(controls_str)
+
         return {
             "id": synth.id,
             "name": synth.name,
             "file_path": synth.file_path,
             "file_hash": synth.file_hash,
-            "characteristics": json.loads(synth.characteristics) if synth.characteristics else {},
-            "categorization": json.loads(synth.categorization) if synth.categorization else {},
+            "characteristics": characteristics_data,
+            "categorization": categorization_data,
             "source_code": synth.source_code,
-            "controls": json.loads(synth.controls) if synth.controls else [],
-            "created_at": datetime.fromisoformat(synth.created_at),
-            "updated_at": datetime.fromisoformat(synth.updated_at),
+            "controls": controls_data,
+            "created_at": datetime.fromisoformat(created_at_str),
+            "updated_at": datetime.fromisoformat(updated_at_str),
         }
 
     def _dict_to_synth(self, synth_dict: dict) -> Synth:
@@ -187,7 +207,8 @@ class SynthStore:
             db_synth = self._dict_to_synth(synth)
             session.add(db_synth)
             session.commit()
-            return db_synth.id
+            synth_id: str = synth["id"]
+            return synth_id
 
         except StorageError:
             session.rollback()
@@ -344,7 +365,7 @@ class SynthStore:
                     setattr(synth, key, value)
 
             # Always update timestamp
-            synth.updated_at = datetime.now().isoformat()
+            setattr(synth, "updated_at", datetime.now().isoformat())
 
             session.commit()
             return True
@@ -591,14 +612,15 @@ class SynthStore:
         try:
             lineages = session.query(SynthLineage).filter_by(synth_id=synth_id).all()
 
-            return [
-                {
+            result = []
+            for l in lineages:
+                created_at_str: str = l.created_at  # type: ignore
+                result.append({
                     "parent_synth_id": l.parent_synth_id,
                     "contribution_weight": l.contribution_weight,
-                    "created_at": datetime.fromisoformat(l.created_at),
-                }
-                for l in lineages
-            ]
+                    "created_at": datetime.fromisoformat(created_at_str),
+                })
+            return result
 
         finally:
             session.close()

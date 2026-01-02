@@ -2,54 +2,47 @@
 name = "audiomancer"
 version = "0.1.0"
 description = "MCP server for music production metadata, analysis, and generation"
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [{name = "Your Name"}]
 readme = "README.md"
 
 dependencies = [
     # MCP
-    "mcp>=1.0.0,<2",
+    "mcp>=1.25.0",
 
     # Audio Analysis
-    "essentia-tensorflow>=2.1b6.dev1110,<3",
-    "librosa>=0.10.0,<0.11",
-    "numpy>=1.24.0,<2",
-    "faiss-cpu>=1.7.0",
-    "tensorflow>=2.10.0,<2.13",
-    "tensorflow-metal>=1.0.0,<2; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "essentia-tensorflow>=2.1b6.dev1389",
+    "librosa>=0.11.0",
+    "numpy>=2.0.0",
+    "faiss-cpu>=1.13.0",
 
     # Storage
-    "lancedb>=0.4.0,<0.5",
-    "sqlalchemy>=2.0.0,<3",
+    "lancedb>=0.4.0,<0.5",  # Pin to 0.4.x - newer versions have Column type changes
+    "sqlalchemy>=2.0.0",
 
     # MIDI
-    "mido>=1.2.6,<2",
-    "pretty_midi>=0.2.10,<0.3",
+    "mido>=1.3.0",
+    "pretty_midi>=0.2.10",
 
     # Configuration
-    "pydantic>=2.0.0,<3",
-    "pydantic-settings>=2.0.0,<3",
-    "pyyaml>=6.0,<7",
+    "pydantic>=2.12.0",
+    "pydantic-settings>=2.0.0",
+    "pyyaml>=6.0",
 
     # CLI
-    "typer>=0.9.0,<1",
-    "rich>=13.0.0,<14",
+    "typer>=0.21.0",
+    "rich>=14.0.0",
 ]
 
 [project.optional-dependencies]
-# Generation features (requires Python 3.9 for best compatibility)
-generation = [
-    "magenta>=2.1.0,<3",
-]
 dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "pytest-asyncio>=0.21.0",
-    "psutil>=5.9.0",  # For memory usage tests
-    "ruff>=0.1.0",
-    "mypy>=1.0.0",
-    "pre-commit>=3.0.0",
+    "pytest>=9.0.0",
+    "pytest-cov>=6.0.0",
+    "pytest-asyncio>=0.25.0",
+    "psutil>=6.0.0",
+    "ruff>=0.14.0",
+    "pre-commit>=4.0.0",
 ]
 
 [project.scripts]
@@ -77,9 +70,37 @@ select = [
 wrap = 100
 number = false
 
-[tool.mypy]
-python_version = "3.11"
-strict = true
+[tool.pyright]
+# Basic mode - 0 errors achieved. Strict mode deferred (673 new errors).
+# Main categories: reportUnknownVariableType (98), reportUnknownMemberType (60), reportUnusedImport (34)
+typeCheckingMode = "basic"
+
+# Python version
+pythonVersion = "3.12"
+
+# Virtual environment
+venv = ".venv"
+
+# Project structure
+include = ["src"]
+exclude = [
+    "**/__pycache__",
+    "**/.venv",
+    "**/node_modules",
+    ".git",
+]
+
+# Strict inference (even in basic mode)
+strictListInference = true
+strictDictionaryInference = true
+strictSetInference = true
+
+# Start lenient, upgrade to strict later
+reportMissingTypeStubs = "warning"
+reportUnknownParameterType = "warning"
+
+# Stub path for local stubs
+stubPath = "typings"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

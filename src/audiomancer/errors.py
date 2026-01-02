@@ -5,6 +5,7 @@ All exceptions inherit from AudiomancerError and include structured context
 via the `details` dictionary for debugging and actionable error messages.
 """
 
+from pathlib import Path
 from typing import Optional, Dict, Any
 
 

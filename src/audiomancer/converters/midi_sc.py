@@ -168,7 +168,7 @@ def midi_to_supercollider(
         return f'Pbind(\\instrument, \\{synth_name}).play;'
 
 
-def _to_pbind(notes: list, synth_name: str, bpm: float) -> str:
+def _to_pbind(notes: list[dict[str, float]], synth_name: str, bpm: float) -> str:
     """Generate Pbind code.
 
     Args:
@@ -199,7 +199,7 @@ def _to_pbind(notes: list, synth_name: str, bpm: float) -> str:
         dur = max(dur, 0.01)
 
         durations.append(dur)
-        freqs.append(midi_to_freq(note['note']))
+        freqs.append(midi_to_freq(int(note['note'])))
         amps.append(note['velocity'])
 
         # Legato: how much of the duration the note actually sounds
@@ -221,7 +221,7 @@ def _to_pbind(notes: list, synth_name: str, bpm: float) -> str:
 ).play;'''
 
 
-def _to_routine(notes: list, synth_name: str, bpm: float) -> str:
+def _to_routine(notes: list[dict[str, float]], synth_name: str, bpm: float) -> str:
     """Generate Routine code with explicit timing.
 
     Args:
@@ -238,7 +238,7 @@ def _to_routine(notes: list, synth_name: str, bpm: float) -> str:
     lines = ['Routine({']
 
     for i, note in enumerate(notes):
-        freq = midi_to_freq(note['note'])
+        freq = midi_to_freq(int(note['note']))
         amp = note['velocity']
         dur = note['duration']
 
@@ -254,7 +254,7 @@ def _to_routine(notes: list, synth_name: str, bpm: float) -> str:
     return '\n'.join(lines)
 
 
-def _to_pdef(notes: list, synth_name: str, bpm: float) -> str:
+def _to_pdef(notes: list[dict[str, float]], synth_name: str, bpm: float) -> str:
     """Generate Pdef pattern definition.
 
     Args:
@@ -281,7 +281,7 @@ def _to_pdef(notes: list, synth_name: str, bpm: float) -> str:
 
         dur = max(dur, 0.01)
         durations.append(dur)
-        freqs.append(midi_to_freq(note['note']))
+        freqs.append(midi_to_freq(int(note['note'])))
         amps.append(note['velocity'])
 
     # Format arrays

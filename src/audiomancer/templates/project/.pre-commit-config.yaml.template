@@ -46,6 +46,18 @@ repos:
         name: Lint Haskell
         files: '(\.hs$|\.tidal$|\.tidal\.template$)'
 
+  # Python type checking with pyright
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v{{ pyright_version }}
+    hooks:
+      - id: pyright
+        name: Type check with pyright
+        files: '\.py$'
+        additional_dependencies:
+          - types-tqdm
+          - questionary>=2.0.0
+          - tqdm>=4.66.0
+
   # Local hooks
   - repo: local
     hooks:

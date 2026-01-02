@@ -5,6 +5,7 @@ Extracts key, tuning, and pitch salience using Essentia.
 
 import essentia.standard as es
 import numpy as np
+from typing import Any
 
 from ..errors import AnalysisFailedError
 
@@ -12,7 +13,7 @@ from ..errors import AnalysisFailedError
 def extract_tonal_features(
     audio: np.ndarray,
     sr: int
-) -> dict:
+) -> dict[str, Any]:
     """
     Extract tonal/pitch features using Essentia.
 
