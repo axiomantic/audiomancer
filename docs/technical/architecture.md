@@ -84,7 +84,21 @@ The MCP server exposes 15 tools to AI assistants:
 
 See [MCP Server](mcp-server.md) for details.
 
-## Data Flow
+## System Architecture
+
+![Audiomancer Architecture](../assets/architecture.svg)
+
+The diagram shows the complete data flow through the system:
+
+1. **Sample Library** (source directory) contains original sample packs
+2. **Library Manager** copies files to local cache and creates symlinks
+3. **Audio Analyzers** extract features and generate ML embeddings
+4. **Storage Layer** persists metadata (SQLite) and vectors (LanceDB)
+5. **Pattern Generators** query samples and create TidalCycles code
+6. **MCP Server** exposes 15 tools to AI clients
+7. **SuperDirt** loads enabled samples via symlinks
+
+### Data Flow
 
 ```
 Sample Pack (local source directory)

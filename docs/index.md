@@ -15,22 +15,18 @@ It's designed for TidalCycles live coding but the analysis and search features w
 
 ## Architecture
 
-```
-Sample Library (local directory, Dropbox, NAS, etc.)
-        |
-        | MCP: enable_pack, disable_pack
-        v
-+------------------+     +------------------+
-|  samples/        | --> |  library/        |  (symlinks)
-|  (local cache)   |     |  (SuperDirt)     |
-+------------------+     +------------------+
-        |
-        | MCP: generate_pattern (with sample_lookup)
-        v
-+------------------+
-|  TidalCycles     |  d1 $ sound "808dk_bd 808dk_bd ~ 808dk_sn"
-+------------------+
-```
+![Audiomancer Architecture](assets/architecture.svg)
+
+**Quick overview:**
+
+- **Sample Library** (source directory) contains your sample packs
+- **Library Manager** copies files to local cache and creates symlinks for SuperDirt
+- **Audio Analyzers** extract features and generate ML embeddings
+- **Storage** persists metadata (SQLite) and vectors (LanceDB)
+- **Pattern Generators** query samples and create TidalCycles code
+- **MCP Server** exposes 15 tools to AI clients
+
+See [Technical Architecture](technical/architecture.md) for detailed documentation.
 
 ## Quick Links
 

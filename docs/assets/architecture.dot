@@ -1,0 +1,89 @@
+digraph audiomancer {
+    // Graph configuration
+    rankdir=TB;
+    bgcolor="transparent";
+    fontname="Helvetica,Arial,sans-serif";
+    node [fontname="Helvetica,Arial,sans-serif", fontsize=11];
+    edge [fontname="Helvetica,Arial,sans-serif", fontsize=9];
+
+    // Styling
+    node [shape=box, style="rounded,filled", fillcolor="#f0f0f0"];
+    edge [color="#666666"];
+
+    // External components
+    node [fillcolor="#e8f4f8", color="#4a90a4"];
+    client [label="Claude/AI Client\n(MCP Client)"];
+    source [label="Sample Library\n(Source Directory)", shape=folder];
+    superdirt [label="SuperDirt/\nTidalCycles"];
+
+    // MCP Server (central)
+    node [fillcolor="#d4e8d4", color="#5a8a5a"];
+    mcp [label="MCP Server\n(15 Tools)", penwidth=2];
+
+    // Core modules
+    node [fillcolor="#fff4e6", color="#cc8800"];
+    library [label="Library Manager\n• Pack management\n• File copying\n• Symlinks"];
+    analyzers [label="Audio Analyzers\n• Essentia\n• librosa\n• ML embeddings"];
+    generators [label="Pattern Generators\n• Drum patterns\n• Melodies\n• Bass lines"];
+
+    // Storage layer
+    node [fillcolor="#f0e6ff", color="#7744aa"];
+    storage [label="Storage Layer"];
+    sqlite [label="SQLite\n(Metadata)"];
+    lancedb [label="LanceDB\n(Vectors)"];
+
+    // File system
+    node [fillcolor="#ffe6e6", color="#cc4444", shape=folder];
+    cache [label="samples/\n(Local Cache)"];
+    enabled [label="library/\n(Symlinks)"];
+
+    // CLI
+    node [fillcolor="#f0f0f0", color="#666666"];
+    cli [label="CLI (Typer)"];
+
+    // Data flow
+    client -> mcp [label="MCP Protocol"];
+    cli -> library [label="Direct calls"];
+    cli -> analyzers;
+    cli -> generators;
+
+    mcp -> library [label="enable_pack\ndisable_pack\npurge_pack"];
+    mcp -> analyzers [label="analyze_file\ndescribe_sample"];
+    mcp -> generators [label="generate_pattern\nlist_synths"];
+    mcp -> storage [label="search_samples\nfind_similar"];
+
+    source -> library [label="Copy files"];
+    library -> cache [label="Store"];
+    library -> analyzers [label="Analyze"];
+    library -> enabled [label="Symlink"];
+
+    analyzers -> storage [label="Store metadata\nand embeddings"];
+
+    storage -> sqlite;
+    storage -> lancedb;
+
+    generators -> storage [label="Query samples"];
+    generators -> superdirt [label="TidalCycles\npattern code"];
+
+    enabled -> superdirt [label="Load samples"];
+
+    // Subgraph for storage layer
+    subgraph cluster_storage {
+        label="Persistent Storage";
+        style=dashed;
+        color="#999999";
+        fontsize=10;
+        sqlite;
+        lancedb;
+    }
+
+    // Subgraph for file system
+    subgraph cluster_filesystem {
+        label="File System";
+        style=dashed;
+        color="#999999";
+        fontsize=10;
+        cache;
+        enabled;
+    }
+}
