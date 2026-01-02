@@ -124,10 +124,7 @@ class LibraryConfig(BaseModel):
     """
     # Source directory (e.g., Google Drive samples folder)
     source_dir: Path = Field(
-        default_factory=lambda: Path(
-            "~/Library/CloudStorage/GoogleDrive-elijahr@gmail.com/"
-            "My Drive/Manual Library/Music Production/Samples"
-        ).expanduser().resolve()
+        default_factory=lambda: Path("~/Music/Samples").expanduser().resolve()
     )
 
     # Project root - expects samples/ and library/ subdirectories
@@ -207,7 +204,7 @@ BUILTIN_DEFAULTS: Dict[str, Any] = {
         "max_days": 7
     },
     "library": {
-        "source_dir": "~/Library/CloudStorage/GoogleDrive-elijahr@gmail.com/My Drive/Manual Library/Music Production/Samples",
+        "source_dir": "~/Music/Samples",
         "project_root": "~/Development/my-music",
         "auto_analyze": True,
         "max_file_size_mb": 10,
