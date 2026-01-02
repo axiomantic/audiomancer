@@ -2,6 +2,8 @@
 
 **MCP server for AI-assisted music production.** Manages sample libraries, analyzes audio, generates patterns, and integrates with TidalCycles live coding.
 
+![audiomancer CLI demo](assets/gifs/cli-overview.gif)
+
 ## What is Audiomancer?
 
 Audiomancer gives AI assistants deep integration with music production workflows. Instead of just chatting about music, the AI can:

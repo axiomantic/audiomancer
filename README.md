@@ -1,6 +1,19 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+- [audiomancer](#audiomancer)
+  - [Features](#features)
+  - [Quick Start](#quick-start)
+  - [Documentation](#documentation)
+  - [License](#license)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # audiomancer
 
 MCP server for AI-assisted music production with TidalCycles. Manage sample libraries, analyze audio, generate patterns, and enable AI-driven live coding workflows.
+
+![audiomancer CLI demo](docs/assets/gifs/cli-overview.gif)
 
 ## Features
 
