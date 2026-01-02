@@ -7,9 +7,10 @@ repo_name: axiomantic/audiomancer
 theme:
   name: material
   features:
-    - navigation.tabs
     - navigation.sections
+    - navigation.expand
     - navigation.top
+    - toc.integrate
     - search.suggest
     - search.highlight
     - content.code.copy

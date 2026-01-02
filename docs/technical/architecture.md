@@ -87,7 +87,7 @@ See [MCP Server](mcp-server.md) for details.
 ## Data Flow
 
 ```
-Sample Pack (Google Drive)
+Sample Pack (local source directory)
         |
         v
 LibraryManager.enable_pack()

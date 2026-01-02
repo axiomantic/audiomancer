@@ -2,7 +2,7 @@
 
 ## Sample Library Management
 
-**Goal**: Enable sample packs from Google Drive for use in TidalCycles.
+**Goal**: Enable sample packs from your sample library for use in TidalCycles.
 
 ```
 You: "What sample packs do I have?"
@@ -34,7 +34,7 @@ AI: [calls list_enabled_samples, filters by category]
 
 **Pack Status**:
 
-- `remote` - On Google Drive, not cached locally
+- `remote` - In source directory, not cached locally
 - `cached` - Copied to samples/, but not enabled (no symlinks)
 - `enabled` - Active in library/, SuperDirt can load it
 

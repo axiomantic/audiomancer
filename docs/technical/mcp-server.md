@@ -418,4 +418,4 @@ pytest tests/integration/test_mcp_server.py -v
 
 - [Configuration Guide](config.md)
 - [Audio Analysis](analysis.md)
-- [MCP Protocol Spec](https://modelcontextprotocol.io/)
+- MCP Protocol Spec: [https://modelcontextprotocol.io/](https://modelcontextprotocol.io/)

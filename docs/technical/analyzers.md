@@ -269,6 +269,6 @@ def analyze_all(directory: Path):
 
 ## References
 
-- Librosa documentation: https://librosa.org/
-- Essentia documentation: https://essentia.upf.edu/
+- Librosa documentation: [https://librosa.org/](https://librosa.org/)
+- Essentia documentation: [https://essentia.upf.edu/](https://essentia.upf.edu/)
 - Audio feature extraction theory: Peeters, G. (2004). "A large set of audio features for sound description"

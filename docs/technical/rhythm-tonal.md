@@ -179,7 +179,7 @@ Potential enhancements for future versions:
 
 ## References
 
-- [Essentia Documentation](https://essentia.upf.edu/documentation/)
-- [RhythmExtractor2013 Algorithm](https://essentia.upf.edu/reference/std_RhythmExtractor2013.html)
-- [KeyExtractor Algorithm](https://essentia.upf.edu/reference/std_KeyExtractor.html)
-- [PitchSalience Algorithm](https://essentia.upf.edu/reference/std_PitchSalience.html)
+- Essentia Documentation: [https://essentia.upf.edu/documentation/](https://essentia.upf.edu/documentation/)
+- RhythmExtractor2013 Algorithm: [https://essentia.upf.edu/reference/std_RhythmExtractor2013.html](https://essentia.upf.edu/reference/std_RhythmExtractor2013.html)
+- KeyExtractor Algorithm: [https://essentia.upf.edu/reference/std_KeyExtractor.html](https://essentia.upf.edu/reference/std_KeyExtractor.html)
+- PitchSalience Algorithm: [https://essentia.upf.edu/reference/std_PitchSalience.html](https://essentia.upf.edu/reference/std_PitchSalience.html)

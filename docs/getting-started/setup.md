@@ -13,7 +13,7 @@ audiomancer init --path ~/my-music-project
 The `init` command will:
 
 1. Prompt for project name (defaults to directory name)
-2. Prompt for sample source directory (e.g., Google Drive samples folder)
+2. Prompt for sample source directory (any local directory, network mount, Dropbox, etc.)
 3. Create project structure with samples/ and library/ directories
 4. Generate project-specific .audiomancer.yaml config file
 5. Create TidalCycles session files (session.tidal, start_superdirt.scd)

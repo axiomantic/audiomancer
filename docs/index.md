@@ -6,7 +6,7 @@
 
 Audiomancer gives AI assistants deep integration with music production workflows. Instead of just chatting about music, the AI can:
 
-- **Browse and enable sample packs** from Google Drive without you leaving the conversation
+- **Browse and enable sample packs** from your sample library without you leaving the conversation
 - **Generate TidalCycles patterns** using your actual sample library (not generic "bd" and "sn")
 - **Find similar samples** using audio embeddings and semantic search
 - **Analyze audio files** for BPM, key, spectral features, and more
@@ -16,7 +16,7 @@ It's designed for TidalCycles live coding but the analysis and search features w
 ## Architecture
 
 ```
-Google Drive (sample packs)
+Sample Library (local directory, Dropbox, NAS, etc.)
         |
         | MCP: enable_pack, disable_pack
         v

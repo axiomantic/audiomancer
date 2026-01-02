@@ -38,7 +38,7 @@ Final merged configuration
 ```yaml
 # Sample library paths
 library:
-  source_dir: ~/Library/CloudStorage/GoogleDrive/Samples  # Where packs live
+  source_dir: ~/path/to/samples  # Where packs live (any local directory)
   auto_analyze: true
   max_file_size_mb: 10
   copy_workers: 16

@@ -4,7 +4,7 @@ MCP server for AI-assisted music production with TidalCycles. Manage sample libr
 
 ## Features
 
-- **AI-powered sample library management** - Browse and enable sample packs from Google Drive via conversation
+- **AI-powered sample library management** - Browse and enable sample packs from your sample library via conversation
 - **Smart pattern generation** - Generate TidalCycles patterns using your actual enabled samples, not generic names
 - **Semantic sample search** - Find similar samples using audio embeddings and ML-based similarity
 - **Comprehensive audio analysis** - Extract BPM, key, spectral features, and tonal information from any audio file

@@ -89,7 +89,7 @@ Default values defined in `config.py` as `BUILTIN_DEFAULTS`:
         "max_days": 7
     },
     "library": {
-        "source_dir": "~/Library/CloudStorage/GoogleDrive/...",  # Google Drive default
+        "source_dir": "~/path/to/samples",  # Sample library source directory
         "project_root": "~/Development/my-music",
         "auto_analyze": True,
         "max_file_size_mb": 10,
@@ -264,7 +264,7 @@ This tells Claude Code that this directory is an MCP-enabled project. When you o
 
 ```yaml
 library:
-  source_dir: Path         # Where sample packs live (e.g., Google Drive)
+  source_dir: Path         # Where sample packs live (local directory, network mount, etc.)
   project_root: Path       # Project directory (expects samples/ and library/ subdirs)
   auto_analyze: bool       # Auto-analyze samples when enabling packs (default: true)
   max_file_size_mb: int    # Skip files larger than this, 0=no limit (default: 10, range: 0-500)
