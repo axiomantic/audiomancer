@@ -2,122 +2,122 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/configuration/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/unified_storage/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/vector_store_implementation/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/api/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/api/analyzers/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/api/converters/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/api/generators/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/api/library/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/api/storage/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/api/templates/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/configuration/examples/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/configuration/system/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/getting-started/installation/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/getting-started/quickstart/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/getting-started/setup/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/guide/cli/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/guide/mcp-tools/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/guide/workflows/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/plans/2025-12-30-project-scaffolding-design/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/plans/2025-12-30-project-scaffolding-impl/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/technical/analyzers/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/technical/architecture/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/technical/mcp-server/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/technical/midi-converter/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/technical/pattern-generation/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/technical/rhythm-tonal/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/technical/storage/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/technical/synth-evolution/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
     <url>
          <loc>https://axiomantic.github.io/audiomancer/latest/technical/synthdef/</loc>
-         <lastmod>2026-01-02</lastmod>
+         <lastmod>2026-01-04</lastmod>
     </url>
 </urlset>
