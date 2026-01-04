@@ -5,40 +5,37 @@ analysis, and synth metadata access. Tools are designed for LLM consumption
 with structured JSON responses.
 """
 
-import json
 import asyncio
+import json
 import logging
+import platform
+import subprocess
 from pathlib import Path
-from typing import Optional, Any
+from typing import Any
 
-from mcp.server import Server
-from mcp.server.models import InitializationOptions
-from mcp.types import Tool, TextContent
-from mcp.server import stdio
+from mcp.server import Server, stdio
+from mcp.types import TextContent, Tool
 
-from audiomancer.storage.unified import UnifiedSampleStorage
-from audiomancer.storage.synth_store import SynthStore
 from audiomancer.analyzers import (
-    get_basic_metadata,
-    extract_spectral_features,
-    extract_rhythm_features,
-    extract_tonal_features,
-    extract_audio_embedding,
     classify_instrument,
+    extract_audio_embedding,
+    extract_rhythm_features,
+    extract_spectral_features,
+    extract_tonal_features,
+    get_basic_metadata,
 )
-from audiomancer.config import load_config, ensure_directories
+from audiomancer.config import ensure_directories, load_config
 from audiomancer.errors import (
+    AnalysisError,
     AudiomancerError,
     SampleNotFoundError,
-    AnalysisError,
-    LibraryError,
-    PackNotFoundError,
-    SourceNotAvailableError,
 )
 from audiomancer.library import LibraryManager
+from audiomancer.storage.synth_store import SynthStore
+from audiomancer.storage.unified import UnifiedSampleStorage
 
 
-def detect_project_root() -> Optional[Path]:
+def detect_project_root() -> Path | None:
     """Detect project root by searching for .audiomancer.yaml from cwd.
 
     Returns:
@@ -55,9 +52,9 @@ def detect_project_root() -> Optional[Path]:
 server: Server = Server("audiomancer")
 
 # Global storage instances (initialized in main)
-storage: Optional[UnifiedSampleStorage] = None
-synth_store: Optional[SynthStore] = None
-library_manager: Optional[LibraryManager] = None
+storage: UnifiedSampleStorage | None = None
+synth_store: SynthStore | None = None
+library_manager: LibraryManager | None = None
 
 
 @server.list_tools()
@@ -72,35 +69,26 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "Text search query (searches file paths and instrument types)"
+                        "description": "Text search query (searches file paths and instrument types)",
                     },
                     "instrument_type": {
                         "type": "string",
-                        "description": "Filter by instrument classification (e.g., 'kick', 'snare', 'bass')"
+                        "description": "Filter by instrument classification (e.g., 'kick', 'snare', 'bass')",
                     },
-                    "bpm_min": {
-                        "type": "number",
-                        "description": "Minimum BPM"
-                    },
-                    "bpm_max": {
-                        "type": "number",
-                        "description": "Maximum BPM"
-                    },
-                    "key": {
-                        "type": "string",
-                        "description": "Musical key (e.g., 'C', 'Am', 'F#')"
-                    },
+                    "bpm_min": {"type": "number", "description": "Minimum BPM"},
+                    "bpm_max": {"type": "number", "description": "Maximum BPM"},
+                    "key": {"type": "string", "description": "Musical key (e.g., 'C', 'Am', 'F#')"},
                     "mood": {
                         "type": "string",
-                        "description": "Mood tag (e.g., 'dark', 'bright', 'aggressive')"
+                        "description": "Mood tag (e.g., 'dark', 'bright', 'aggressive')",
                     },
                     "limit": {
                         "type": "integer",
                         "default": 20,
-                        "description": "Maximum number of results"
-                    }
-                }
-            }
+                        "description": "Maximum number of results",
+                    },
+                },
+            },
         ),
         Tool(
             name="find_similar",
@@ -110,16 +98,16 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "sample_id": {
                         "type": "string",
-                        "description": "Sample ID to find similar samples for"
+                        "description": "Sample ID to find similar samples for",
                     },
                     "limit": {
                         "type": "integer",
                         "default": 10,
-                        "description": "Maximum number of similar samples to return"
-                    }
+                        "description": "Maximum number of similar samples to return",
+                    },
                 },
-                "required": ["sample_id"]
-            }
+                "required": ["sample_id"],
+            },
         ),
         Tool(
             name="describe_sample",
@@ -129,11 +117,11 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "sample_id": {
                         "type": "string",
-                        "description": "Sample ID to retrieve details for"
+                        "description": "Sample ID to retrieve details for",
                     }
                 },
-                "required": ["sample_id"]
-            }
+                "required": ["sample_id"],
+            },
         ),
         Tool(
             name="analyze_file",
@@ -143,11 +131,11 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "Absolute path to audio file to analyze"
+                        "description": "Absolute path to audio file to analyze",
                     }
                 },
-                "required": ["path"]
-            }
+                "required": ["path"],
+            },
         ),
         Tool(
             name="list_synths",
@@ -157,46 +145,35 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "category": {
                         "type": "string",
-                        "description": "Filter by synth category (e.g., 'bass', 'pad', 'lead')"
+                        "description": "Filter by synth category (e.g., 'bass', 'pad', 'lead')",
                     },
                     "limit": {
                         "type": "integer",
                         "default": 50,
-                        "description": "Maximum number of results"
-                    }
-                }
-            }
+                        "description": "Maximum number of results",
+                    },
+                },
+            },
         ),
         Tool(
             name="get_synth",
             description="Get full details for a SuperCollider SynthDef including controls, source code, and characteristics.",
             inputSchema={
                 "type": "object",
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "description": "SynthDef name"
-                    }
-                },
-                "required": ["name"]
-            }
+                "properties": {"name": {"type": "string", "description": "SynthDef name"}},
+                "required": ["name"],
+            },
         ),
         Tool(
             name="get_stats",
             description="Get library statistics including total samples, synths, instrument type distribution, and BPM ranges.",
-            inputSchema={
-                "type": "object",
-                "properties": {}
-            }
+            inputSchema={"type": "object", "properties": {}},
         ),
         # Library management tools
         Tool(
             name="list_packs",
             description="List all available sample packs from the source directory (e.g., Google Drive). Shows status (enabled/cached/remote) for each pack.",
-            inputSchema={
-                "type": "object",
-                "properties": {}
-            }
+            inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
             name="search_packs",
@@ -206,11 +183,11 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "pattern": {
                         "type": "string",
-                        "description": "Regex pattern to match against pack names"
+                        "description": "Regex pattern to match against pack names",
                     }
                 },
-                "required": ["pattern"]
-            }
+                "required": ["pattern"],
+            },
         ),
         Tool(
             name="get_pack_status",
@@ -218,13 +195,10 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "pack_name": {
-                        "type": "string",
-                        "description": "Name of the pack folder"
-                    }
+                    "pack_name": {"type": "string", "description": "Name of the pack folder"}
                 },
-                "required": ["pack_name"]
-            }
+                "required": ["pack_name"],
+            },
         ),
         Tool(
             name="enable_pack",
@@ -232,18 +206,15 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "pack_name": {
-                        "type": "string",
-                        "description": "Name of the pack to enable"
-                    },
+                    "pack_name": {"type": "string", "description": "Name of the pack to enable"},
                     "max_size_mb": {
                         "type": "integer",
                         "default": 10,
-                        "description": "Skip files larger than this (MB)"
-                    }
+                        "description": "Skip files larger than this (MB)",
+                    },
                 },
-                "required": ["pack_name"]
-            }
+                "required": ["pack_name"],
+            },
         ),
         Tool(
             name="disable_pack",
@@ -251,13 +222,10 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "pack_name": {
-                        "type": "string",
-                        "description": "Name of the pack to disable"
-                    }
+                    "pack_name": {"type": "string", "description": "Name of the pack to disable"}
                 },
-                "required": ["pack_name"]
-            }
+                "required": ["pack_name"],
+            },
         ),
         Tool(
             name="purge_pack",
@@ -265,13 +233,10 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "pack_name": {
-                        "type": "string",
-                        "description": "Name of the pack to purge"
-                    }
+                    "pack_name": {"type": "string", "description": "Name of the pack to purge"}
                 },
-                "required": ["pack_name"]
-            }
+                "required": ["pack_name"],
+            },
         ),
         Tool(
             name="list_enabled_samples",
@@ -281,10 +246,24 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "category": {
                         "type": "string",
-                        "description": "Filter by category (bd, sn, hh, etc.)"
+                        "description": "Filter by category (bd, sn, hh, etc.)",
                     }
-                }
-            }
+                },
+            },
+        ),
+        Tool(
+            name="boot_session",
+            description="Boot the TidalCycles session. Opens VS Code to session.tidal and starts SuperCollider with SuperDirt. macOS only.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "execute_superdirt": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Attempt to execute the SuperDirt startup script automatically (requires Accessibility permissions)",
+                    }
+                },
+            },
         ),
     ]
 
@@ -322,16 +301,29 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             return await purge_pack_tool(**arguments)
         elif name == "list_enabled_samples":
             return await list_enabled_samples_tool(**arguments)
+        elif name == "boot_session":
+            return await boot_session_tool(**arguments)
         else:
             error_response = {
                 "error": "UnknownTool",
                 "message": f"Unknown tool: {name}",
                 "available_tools": [
-                    "search_samples", "find_similar", "describe_sample",
-                    "analyze_file", "list_synths", "get_synth", "get_stats",
-                    "list_packs", "search_packs", "get_pack_status",
-                    "enable_pack", "disable_pack", "purge_pack", "list_enabled_samples"
-                ]
+                    "search_samples",
+                    "find_similar",
+                    "describe_sample",
+                    "analyze_file",
+                    "list_synths",
+                    "get_synth",
+                    "get_stats",
+                    "list_packs",
+                    "search_packs",
+                    "get_pack_status",
+                    "enable_pack",
+                    "disable_pack",
+                    "purge_pack",
+                    "list_enabled_samples",
+                    "boot_session",
+                ],
             }
             return [TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
@@ -342,22 +334,18 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
     except Exception as e:
         # Unexpected error
-        error_response = {
-            "error": "InternalError",
-            "message": str(e),
-            "type": type(e).__name__
-        }
+        error_response = {"error": "InternalError", "message": str(e), "type": type(e).__name__}
         return [TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
 
 async def search_samples(
-    query: Optional[str] = None,
-    instrument_type: Optional[str] = None,
-    bpm_min: Optional[float] = None,
-    bpm_max: Optional[float] = None,
-    key: Optional[str] = None,
-    mood: Optional[list[str]] = None,
-    limit: int = 20
+    query: str | None = None,
+    instrument_type: str | None = None,
+    bpm_min: float | None = None,
+    bpm_max: float | None = None,
+    key: str | None = None,
+    mood: list[str] | None = None,
+    limit: int = 20,
 ) -> list[TextContent]:
     """Search samples with filters.
 
@@ -383,7 +371,7 @@ async def search_samples(
         bpm_max=bpm_max,
         key=key,
         mood=mood,
-        limit=limit
+        limit=limit,
     )
 
     # Format for LLM consumption
@@ -393,17 +381,19 @@ async def search_samples(
         file_path = sample.get("file_path")
         if sample_id is None or file_path is None:
             continue  # Skip samples missing required fields
-        formatted.append({
-            "id": sample_id,
-            "file_path": file_path,
-            "instrument_type": sample.get("instrument_type"),
-            "bpm": sample.get("bpm"),
-            "key": sample.get("key"),
-            "duration_ms": sample.get("duration_ms"),
-            "sample_rate": sample.get("sample_rate"),
-            "channels": sample.get("channels"),
-            "mood": sample.get("mood"),
-        })
+        formatted.append(
+            {
+                "id": sample_id,
+                "file_path": file_path,
+                "instrument_type": sample.get("instrument_type"),
+                "bpm": sample.get("bpm"),
+                "key": sample.get("key"),
+                "duration_ms": sample.get("duration_ms"),
+                "sample_rate": sample.get("sample_rate"),
+                "channels": sample.get("channels"),
+                "mood": sample.get("mood"),
+            }
+        )
 
     response = {
         "results": formatted,
@@ -414,16 +404,13 @@ async def search_samples(
             "bpm_range": [bpm_min, bpm_max] if bpm_min or bpm_max else None,
             "key": key,
             "mood": mood,
-        }
+        },
     }
 
     return [TextContent(type="text", text=json.dumps(response, indent=2))]
 
 
-async def find_similar(
-    sample_id: str,
-    limit: int = 10
-) -> list[TextContent]:
+async def find_similar(sample_id: str, limit: int = 10) -> list[TextContent]:
     """Find samples similar to a given sample.
 
     Args:
@@ -440,16 +427,9 @@ async def find_similar(
         raise AudiomancerError("Storage not initialized")
 
     try:
-        similar = storage.find_similar(
-            sample_id=sample_id,
-            limit=limit,
-            exclude_self=True
-        )
+        similar = storage.find_similar(sample_id=sample_id, limit=limit, exclude_self=True)
     except SampleNotFoundError:
-        raise SampleNotFoundError(
-            sample_id,
-            details={"reason": "No sample with this ID exists"}
-        )
+        raise SampleNotFoundError(sample_id, details={"reason": "No sample with this ID exists"})
 
     # Format results
     formatted = []
@@ -458,20 +438,18 @@ async def find_similar(
         result_path = sample.get("file_path")
         if result_id is None or result_path is None:
             continue  # Skip samples missing required fields
-        formatted.append({
-            "id": result_id,
-            "file_path": result_path,
-            "instrument_type": sample.get("instrument_type"),
-            "bpm": sample.get("bpm"),
-            "key": sample.get("key"),
-            "distance": float(distance),
-        })
+        formatted.append(
+            {
+                "id": result_id,
+                "file_path": result_path,
+                "instrument_type": sample.get("instrument_type"),
+                "bpm": sample.get("bpm"),
+                "key": sample.get("key"),
+                "distance": float(distance),
+            }
+        )
 
-    response = {
-        "query_sample_id": sample_id,
-        "similar_samples": formatted,
-        "count": len(formatted)
-    }
+    response = {"query_sample_id": sample_id, "similar_samples": formatted, "count": len(formatted)}
 
     return [TextContent(type="text", text=json.dumps(response, indent=2))]
 
@@ -500,6 +478,7 @@ async def describe_sample(sample_id: str) -> list[TextContent]:
 
     # Convert datetime objects to ISO strings (handle both datetime and str)
     from datetime import datetime
+
     if "created_at" in serializable_sample:
         if isinstance(serializable_sample["created_at"], datetime):
             serializable_sample["created_at"] = serializable_sample["created_at"].isoformat()
@@ -530,12 +509,13 @@ async def analyze_file(path: str) -> list[TextContent]:
     if not file_path.exists():
         raise AnalysisError(
             f"File not found: {path}",
-            details={"path": str(file_path), "reason": "File does not exist"}
+            details={"path": str(file_path), "reason": "File does not exist"},
         )
 
     try:
         # Run analysis in thread pool to avoid blocking
         import librosa
+
         loop = asyncio.get_event_loop()
 
         # Load audio and extract basic metadata
@@ -556,8 +536,8 @@ async def analyze_file(path: str) -> list[TextContent]:
         instrument = await loop.run_in_executor(None, classify_instrument, audio, sr)
 
         # Combine into sample metadata
+
         from audiomancer.storage.interfaces import SampleMetadata
-        import hashlib
 
         # Generate sample ID from file hash
         sample_id = f"smpl_{basic['file_hash'][:8]}"
@@ -616,7 +596,7 @@ async def analyze_file(path: str) -> list[TextContent]:
                 "bpm": rhythm.get("bpm"),
                 "key": tonal.get("key"),
                 "duration_ms": basic["duration_ms"],
-            }
+            },
         }
 
         return [TextContent(type="text", text=json.dumps(response, indent=2))]
@@ -624,14 +604,11 @@ async def analyze_file(path: str) -> list[TextContent]:
     except Exception as e:
         raise AnalysisError(
             f"Analysis failed for {path}: {str(e)}",
-            details={"path": str(file_path), "error": str(e), "type": type(e).__name__}
+            details={"path": str(file_path), "error": str(e), "type": type(e).__name__},
         )
 
 
-async def list_synths(
-    category: Optional[str] = None,
-    limit: int = 50
-) -> list[TextContent]:
+async def list_synths(category: str | None = None, limit: int = 50) -> list[TextContent]:
     """List available SynthDefs.
 
     Args:
@@ -649,26 +626,25 @@ async def list_synths(
 
     # Filter by category if provided
     if category:
-        synths = [
-            s for s in synths
-            if s.get("categorization", {}).get("category") == category
-        ]
+        synths = [s for s in synths if s.get("categorization", {}).get("category") == category]
 
     # Format for LLM
     formatted = []
     for synth in synths:
-        formatted.append({
-            "id": synth["id"],
-            "name": synth["name"],
-            "category": synth.get("categorization", {}).get("category"),
-            "num_controls": len(synth.get("controls", [])),
-            "has_gate": synth.get("characteristics", {}).get("has_gate", False),
-        })
+        formatted.append(
+            {
+                "id": synth["id"],
+                "name": synth["name"],
+                "category": synth.get("categorization", {}).get("category"),
+                "num_controls": len(synth.get("controls", [])),
+                "has_gate": synth.get("characteristics", {}).get("has_gate", False),
+            }
+        )
 
     response = {
         "synths": formatted,
         "count": len(formatted),
-        "filter": {"category": category} if category else None
+        "filter": {"category": category} if category else None,
     }
 
     return [TextContent(type="text", text=json.dumps(response, indent=2))]
@@ -693,7 +669,7 @@ async def get_synth(name: str) -> list[TextContent]:
     if synth is None:
         raise AudiomancerError(
             f"SynthDef not found: {name}",
-            details={"name": name, "reason": "No synth with this name exists"}
+            details={"name": name, "reason": "No synth with this name exists"},
         )
 
     # Convert datetime objects (handle both datetime and str)
@@ -735,13 +711,14 @@ async def get_stats() -> list[TextContent]:
         },
         "synths": {
             "total": total_synths,
-        }
+        },
     }
 
     return [TextContent(type="text", text=json.dumps(response, indent=2))]
 
 
 # Library management tool handlers
+
 
 async def list_packs_tool() -> list[TextContent]:
     """List all available sample packs from source."""
@@ -755,23 +732,25 @@ async def list_packs_tool() -> list[TextContent]:
     formatted = []
     for pack in packs:
         try:
-            status = await loop.run_in_executor(
-                None, library_manager.get_pack_status, pack["name"]
+            status = await loop.run_in_executor(None, library_manager.get_pack_status, pack["name"])
+            formatted.append(
+                {
+                    "name": pack["name"],
+                    "status": status["status"],
+                    "file_count": pack["file_count"],
+                    "size_mb": round(pack["size_mb"], 1),
+                    "sample_ids": pack["sample_ids"],
+                }
             )
-            formatted.append({
-                "name": pack["name"],
-                "status": status["status"],
-                "file_count": pack["file_count"],
-                "size_mb": round(pack["size_mb"], 1),
-                "sample_ids": pack["sample_ids"],
-            })
         except Exception:
-            formatted.append({
-                "name": pack["name"],
-                "status": "unknown",
-                "file_count": pack["file_count"],
-                "size_mb": round(pack["size_mb"], 1),
-            })
+            formatted.append(
+                {
+                    "name": pack["name"],
+                    "status": "unknown",
+                    "file_count": pack["file_count"],
+                    "size_mb": round(pack["size_mb"], 1),
+                }
+            )
 
     response = {
         "packs": formatted,
@@ -791,21 +770,23 @@ async def search_packs_tool(pattern: str) -> list[TextContent]:
     formatted = []
     for pack in packs:
         try:
-            status = await loop.run_in_executor(
-                None, library_manager.get_pack_status, pack["name"]
+            status = await loop.run_in_executor(None, library_manager.get_pack_status, pack["name"])
+            formatted.append(
+                {
+                    "name": pack["name"],
+                    "status": status["status"],
+                    "file_count": pack["file_count"],
+                    "size_mb": round(pack["size_mb"], 1),
+                }
             )
-            formatted.append({
-                "name": pack["name"],
-                "status": status["status"],
-                "file_count": pack["file_count"],
-                "size_mb": round(pack["size_mb"], 1),
-            })
         except Exception:
-            formatted.append({
-                "name": pack["name"],
-                "file_count": pack["file_count"],
-                "size_mb": round(pack["size_mb"], 1),
-            })
+            formatted.append(
+                {
+                    "name": pack["name"],
+                    "file_count": pack["file_count"],
+                    "size_mb": round(pack["size_mb"], 1),
+                }
+            )
 
     response = {
         "pattern": pattern,
@@ -821,9 +802,7 @@ async def get_pack_status_tool(pack_name: str) -> list[TextContent]:
         raise AudiomancerError("Library manager not initialized")
 
     loop = asyncio.get_event_loop()
-    status = await loop.run_in_executor(
-        None, library_manager.get_pack_status, pack_name
-    )
+    status = await loop.run_in_executor(None, library_manager.get_pack_status, pack_name)
 
     return [TextContent(type="text", text=json.dumps(status, indent=2))]
 
@@ -855,9 +834,7 @@ async def disable_pack_tool(pack_name: str) -> list[TextContent]:
         raise AudiomancerError("Library manager not initialized")
 
     loop = asyncio.get_event_loop()
-    count = await loop.run_in_executor(
-        None, library_manager.disable_pack, pack_name
-    )
+    count = await loop.run_in_executor(None, library_manager.disable_pack, pack_name)
 
     response = {
         "success": True,
@@ -874,9 +851,7 @@ async def purge_pack_tool(pack_name: str) -> list[TextContent]:
         raise AudiomancerError("Library manager not initialized")
 
     loop = asyncio.get_event_loop()
-    removed = await loop.run_in_executor(
-        None, library_manager.purge_pack, pack_name
-    )
+    removed = await loop.run_in_executor(None, library_manager.purge_pack, pack_name)
 
     response = {
         "success": removed,
@@ -886,7 +861,7 @@ async def purge_pack_tool(pack_name: str) -> list[TextContent]:
     return [TextContent(type="text", text=json.dumps(response, indent=2))]
 
 
-async def list_enabled_samples_tool(category: Optional[str] = None) -> list[TextContent]:
+async def list_enabled_samples_tool(category: str | None = None) -> list[TextContent]:
     """List enabled sample IDs."""
     if library_manager is None:
         raise AudiomancerError("Library manager not initialized")
@@ -913,8 +888,210 @@ async def list_enabled_samples_tool(category: Optional[str] = None) -> list[Text
         "by_category": by_category,
         "count": len(samples),
         "filter": {"category": category} if category else None,
-        "tip": "Use sample IDs in TidalCycles: d1 $ sound \"sample_id\"",
+        "tip": 'Use sample IDs in TidalCycles: d1 $ sound "sample_id"',
     }
+    return [TextContent(type="text", text=json.dumps(response, indent=2))]
+
+
+async def boot_session_tool(execute_superdirt: bool = False) -> list[TextContent]:
+    """Boot the TidalCycles session.
+
+    Opens VS Code to session.tidal and starts SuperCollider with SuperDirt.
+    macOS only due to AppleScript requirements.
+
+    Args:
+        execute_superdirt: If True, attempt to execute the SuperDirt script
+            automatically using AppleScript (requires Accessibility permissions).
+
+    Returns:
+        TextContent with boot status and session info.
+
+    Raises:
+        AudiomancerError: If not on macOS or project not detected.
+    """
+    # Check platform
+    if platform.system() != "Darwin":
+        raise AudiomancerError(
+            "boot_session is only available on macOS",
+            details={
+                "platform": platform.system(),
+                "reason": "AppleScript required for SuperCollider automation",
+                "manual_steps": [
+                    "1. Open VS Code to session.tidal",
+                    "2. Open SuperCollider",
+                    "3. Open start_superdirt.scd",
+                    "4. Execute with Cmd+Shift+Enter",
+                ],
+            },
+        )
+
+    # Get project root
+    project_root = detect_project_root()
+    if project_root is None:
+        raise AudiomancerError(
+            "No audiomancer project detected",
+            details={
+                "reason": "Could not find .audiomancer.yaml in current directory or parents",
+                "fix": "Run from a directory containing an audiomancer project",
+            },
+        )
+
+    session_path = project_root / "session.tidal"
+    superdirt_path = project_root / "start_superdirt.scd"
+
+    # Validate files exist
+    if not session_path.exists():
+        raise AudiomancerError(
+            f"session.tidal not found at {session_path}",
+            details={"path": str(session_path)},
+        )
+
+    if not superdirt_path.exists():
+        raise AudiomancerError(
+            f"start_superdirt.scd not found at {superdirt_path}",
+            details={"path": str(superdirt_path)},
+        )
+
+    loop = asyncio.get_event_loop()
+    results: dict[str, Any] = {
+        "project_root": str(project_root),
+        "vscode": {"status": "pending"},
+        "supercollider": {"status": "pending"},
+    }
+
+    # Open VS Code
+    try:
+        await loop.run_in_executor(
+            None,
+            lambda: subprocess.run(
+                ["code", "--goto", f"{session_path}:1"],
+                check=True,
+                capture_output=True,
+            ),
+        )
+        results["vscode"] = {"status": "opened", "file": str(session_path)}
+    except FileNotFoundError:
+        # Try fallback with 'open -a'
+        try:
+            await loop.run_in_executor(
+                None,
+                lambda: subprocess.run(
+                    ["open", "-a", "Visual Studio Code", str(session_path)],
+                    check=True,
+                    capture_output=True,
+                ),
+            )
+            results["vscode"] = {"status": "opened", "file": str(session_path)}
+        except Exception as e:
+            results["vscode"] = {"status": "failed", "error": str(e)}
+    except Exception as e:
+        results["vscode"] = {"status": "failed", "error": str(e)}
+
+    # Open SuperCollider with the startup script
+    try:
+        await loop.run_in_executor(
+            None,
+            lambda: subprocess.run(
+                ["open", "-a", "SuperCollider", str(superdirt_path)],
+                check=True,
+                capture_output=True,
+            ),
+        )
+        results["supercollider"] = {
+            "status": "opened",
+            "file": str(superdirt_path),
+            "executed": False,
+        }
+
+        # Attempt to execute if requested
+        if execute_superdirt:
+            await asyncio.sleep(2)  # Wait for SuperCollider to open the file
+
+            applescript = """
+            tell application "SuperCollider" to activate
+            delay 0.5
+            tell application "System Events"
+                tell process "SuperCollider"
+                    keystroke return using {command down, shift down}
+                end tell
+            end tell
+            """
+
+            try:
+                await loop.run_in_executor(
+                    None,
+                    lambda: subprocess.run(
+                        ["osascript", "-e", applescript],
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    ),
+                )
+                results["supercollider"]["executed"] = True
+            except subprocess.CalledProcessError as e:
+                # AppleScript failed, likely permissions issue
+                if "not allowed" in (e.stderr or ""):
+                    results["supercollider"]["executed"] = False
+                    results["supercollider"]["execute_error"] = (
+                        "Accessibility permissions required. "
+                        "Grant Terminal/audiomancer access in System Preferences > "
+                        "Privacy & Security > Accessibility"
+                    )
+                else:
+                    results["supercollider"]["executed"] = False
+                    results["supercollider"]["execute_error"] = e.stderr or str(e)
+
+    except Exception as e:
+        results["supercollider"] = {"status": "failed", "error": str(e)}
+
+    # Get enabled sample info
+    enabled_count = 0
+    categories: dict[str, int] = {}
+    if library_manager is not None:
+        try:
+            samples = await loop.run_in_executor(None, library_manager.list_enabled_samples)
+            enabled_count = len(samples)
+            for sample in samples:
+                cat = sample.get("category", "misc")
+                categories[cat] = categories.get(cat, 0) + 1
+        except Exception:
+            pass  # Non-critical, just skip
+
+    # Build next steps based on context
+    next_steps: list[str] = []
+    if not results["supercollider"].get("executed"):
+        next_steps.append("Execute start_superdirt.scd in SuperCollider (Cmd+Shift+Enter)")
+
+    if enabled_count == 0:
+        next_steps.append("Enable sample packs with: enable_pack or ask to enable packs")
+    else:
+        next_steps.append(
+            f"Ready to play with {enabled_count} samples across {len(categories)} categories"
+        )
+
+    # Build response
+    response = {
+        "success": (
+            results["vscode"].get("status") == "opened"
+            and results["supercollider"].get("status") == "opened"
+        ),
+        "project_root": str(project_root),
+        "vscode": results["vscode"],
+        "supercollider": results["supercollider"],
+        "samples": {
+            "enabled_count": enabled_count,
+            "categories": categories,
+        },
+        "quick_reference": {
+            "play": 'd1 $ sound "bd bd bd bd"',
+            "stop_all": "hush",
+            "stop_channel": "d1 $ silence",
+            "evaluate_line": "Shift+Enter",
+            "evaluate_block": "Ctrl+Enter (VS Code) or Cmd+Enter",
+        },
+        "next_steps": next_steps,
+    }
+
     return [TextContent(type="text", text=json.dumps(response, indent=2))]
 
 
@@ -937,8 +1114,7 @@ async def main():
 
     # Initialize storage
     storage = UnifiedSampleStorage(
-        db_path=config.storage.db_path,
-        embeddings_path=config.storage.embeddings_path
+        db_path=config.storage.db_path, embeddings_path=config.storage.embeddings_path
     )
 
     synth_store = SynthStore(str(config.storage.db_path))

@@ -80,6 +80,10 @@ select = [
     "UP",  # pyupgrade
 ]
 
+[tool.ruff.lint.per-file-ignores]
+# MCP tool descriptions are meant to be read by LLMs, not wrapped
+"src/audiomancer/server.py" = ["E501"]
+
 [tool.mdformat]
 wrap = 100
 number = false

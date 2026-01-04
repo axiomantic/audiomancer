@@ -1,0 +1,1 @@
+SESSION START INSTRUCTION: This is a TidalCycles live coding project. Greet the user briefly and suggest they type /boot to start their session (opens VS Code and SuperCollider). Keep the greeting to 2-3 sentences max.
